@@ -1,19 +1,33 @@
 import { expect, test } from '@playwright/test';
-import { readLayoutShifts, recordLayoutShifts, settle } from './support.js';
+import { distantServer, readLayoutShifts, recordLayoutShifts, settle } from './support.js';
 
-test('preloads exactly one font file: the Latin Inter that first paint needs', async ({ page }) => {
+// The script in src/app.html names the font by a fixed address, so the address cannot carry a
+// version the way a built file's does. The font is cached by time instead: a browser keeps it for
+// a month, and after that goes on using its copy while it fetches a new one in the background.
+// Without the header a browser asks the server about the file on every visit, and a visit from
+// far away would start in the fallback every time.
+test('the font may be kept, and refreshed in the background', async ({ request }) => {
+	const response = await request.get('/fonts/inter-latin.woff2');
+
+	expect(response.status()).toBe(200);
+	expect(response.headers()['cache-control']).toBe(
+		'public, max-age=2592000, stale-while-revalidate=31536000'
+	);
+});
+
+// A preload link looks like the obvious way to fetch the font early, and it would undo the work of
+// the script in src/app.html: Chromium holds its first frame for a preloaded font whether or not
+// the font can arrive in time, and a link cannot be made to depend on anything.
+test('no font is preloaded by a link', async ({ page }) => {
 	await page.goto('/');
+	await settle(page);
 
-	const preloads = await page
-		.locator('link[rel="preload"][as="font"]')
-		.evaluateAll((links) => links.map((link) => (link as HTMLLinkElement).href));
-
-	expect(preloads).toHaveLength(1);
-	expect(preloads[0]).toMatch(/inter-latin-opsz-normal\.[\w-]+\.woff2$/);
+	await expect(page.locator('link[rel="preload"][as="font"]')).toHaveCount(0);
 });
 
 // Inter is used on a visit when it has loaded by the first frame. Chromium holds its first frame
-// back briefly for a preloaded font, so it gets there on a first visit. The others do not wait:
+// back briefly for a font the page has asked for, so it gets there on a first visit to a server
+// that is close, as the test server is. The others do not wait:
 // they get there once the file is cached, and on a busy machine not on every load even then. So
 // this asks for what is promised, that a visit with the file cached can start in Inter, and
 // reloads until one does. If the script in src/app.html ever ruled Inter out for good, no reload
@@ -42,6 +56,57 @@ test('renders text in Inter once it is cached, and headings in its display cut',
 		() => getComputedStyle(document.querySelector('h1')!).fontVariationSettings
 	);
 	expect(headingVariation).toBe('"opsz" 32');
+});
+
+// Chromium holds its first frame for up to 100 ms while a font asked for in the <head> is on its
+// way, and then paints the fallback anyway if the font has not arrived. From a server that takes
+// more than 35 ms to answer the font cannot arrive in time, so the page must not ask: it takes the fallback
+// at once and fetches the font once the page has long loaded. The next visit finds the file in the
+// cache and starts in Inter, however far away the server is.
+test('a first visit from far away does not wait for the font, and the next visit has it', async ({
+	page,
+	baseURL
+}) => {
+	const far = await distantServer(baseURL!, 150);
+	try {
+		// The font is put off until a few seconds after the page has loaded, so that it does not
+		// compete with the scripts the page is waiting for.
+		const fetched = page.waitForResponse((response) => response.url().endsWith('.woff2'));
+		await page.goto(far.origin);
+		await settle(page);
+		expect(await page.evaluate(() => document.documentElement.dataset.font)).toBe('fallback');
+		await (await fetched).finished();
+
+		const { requested, loaded } = await page.evaluate(() => {
+			const [navigation] = performance.getEntriesByType(
+				'navigation'
+			) as PerformanceNavigationTiming[];
+			const font = performance
+				.getEntriesByType('resource')
+				.find((entry) => /\.woff2$/.test(entry.name));
+			return { requested: font?.startTime, loaded: navigation.loadEventStart };
+		});
+		expect(requested, 'the font is fetched on this visit, for the next').toBeDefined();
+		expect(requested, 'and only once the page has loaded').toBeGreaterThanOrEqual(loaded);
+
+		await expect(async () => {
+			// A new navigation and not a reload: some browsers check every file again on a reload,
+			// and from this far away the answer would come after the first frame.
+			await page.goto(far.origin);
+			await settle(page);
+
+			const { fallbackOnly, interLoaded } = await page.evaluate(() => ({
+				fallbackOnly: document.documentElement.dataset.font === 'fallback',
+				interLoaded: [...document.fonts].some(
+					(face) => face.family.replaceAll('"', '') === 'Inter' && face.status === 'loaded'
+				)
+			}));
+			expect(fallbackOnly).toBe(false);
+			expect(interLoaded).toBe(true);
+		}).toPass({ timeout: 20_000 });
+	} finally {
+		await far.close();
+	}
 });
 
 declare global {

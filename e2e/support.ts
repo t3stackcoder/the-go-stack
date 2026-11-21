@@ -1,4 +1,6 @@
 import { globSync } from 'node:fs';
+import { createServer, request } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { expect, type ConsoleMessage, type Page } from '@playwright/test';
 
 /**
@@ -172,6 +174,43 @@ export async function holdLateArrivals(page: Page) {
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The same server, as seen from far away: a second address that answers every request `ms` late.
+ *
+ * `page.route` cannot stand in for this. It holds a request back before the browser has sent it,
+ * so the browser's own timings show a server that answered at once, and the page reads those
+ * timings to decide whether the server is close enough to wait for the font (see src/app.html).
+ */
+export async function distantServer(baseURL: string, ms: number) {
+	const proxy = createServer((incoming, outgoing) => {
+		setTimeout(() => {
+			const forwarded = request(
+				new URL(incoming.url ?? '/', baseURL),
+				{ method: incoming.method, headers: incoming.headers },
+				(response) => {
+					outgoing.writeHead(response.statusCode ?? 502, response.headers);
+					response.pipe(outgoing);
+				}
+			);
+			// Only a test is listening, so a failure is passed on as a broken response for it to see.
+			forwarded.on('error', () => outgoing.destroy());
+			incoming.pipe(forwarded);
+		}, ms);
+	});
+
+	await new Promise<void>((resolve) => proxy.listen(0, 'localhost', resolve));
+	const { port } = proxy.address() as AddressInfo;
+
+	return {
+		origin: `http://localhost:${port}`,
+		close: () =>
+			new Promise<void>((resolve) => {
+				proxy.close(() => resolve());
+				proxy.closeAllConnections();
+			})
+	};
+}
 
 /**
  * The conditions under which jank normally shows up: a slow processor, a font and images that

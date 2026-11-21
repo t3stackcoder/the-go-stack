@@ -15,8 +15,36 @@ const SAFE_MESSAGE = 'Something went wrong on our side. It has been recorded.';
 
 declare global {
 	interface Window {
-		__beacon?: string;
+		__reports: string[];
 	}
+}
+
+type Report = Record<string, string>;
+
+/**
+ * Keeps every error report the page hands to the browser, so a test can read it. Call before
+ * `page.goto`. Reports are read at that point because not every browser shows a test the body of a
+ * beacon; that one is then really sent is checked separately, where it matters.
+ */
+async function keepReports(page: Page) {
+	await page.addInitScript(() => {
+		window.__reports = [];
+		const send = navigator.sendBeacon.bind(navigator);
+		navigator.sendBeacon = (url, data) => {
+			void (data as Blob).text().then((text) => window.__reports.push(text));
+			return send(url, data);
+		};
+	});
+}
+
+async function readReports(page: Page): Promise<Report[]> {
+	return (await page.evaluate(() => window.__reports)).map((text) => JSON.parse(text) as Report);
+}
+
+/** Waits until the page has reported at least `count` errors, and returns them. */
+async function reportsOnceThereAre(page: Page, count: number): Promise<Report[]> {
+	await page.waitForFunction((expected) => window.__reports.length >= expected, count);
+	return readReports(page);
 }
 
 /** The frame every page has: the chapter navigation above and the readout below. */
@@ -103,15 +131,7 @@ test.describe('a page that fails in the browser', () => {
 		// The client-rendered page fetches its catalog from the browser. Here that request fails.
 		await page.route('**/api/catalog', (route) => route.fulfill({ status: 500, body: 'down' }));
 
-		// The report is read as the page hands it to the browser, because not every browser shows
-		// a test the body of a beacon. That it is then really sent is checked separately, below.
-		await page.addInitScript(() => {
-			const send = navigator.sendBeacon.bind(navigator);
-			navigator.sendBeacon = (url, data) => {
-				void (data as Blob).text().then((text) => (window.__beacon = text));
-				return send(url, data);
-			};
-		});
+		await keepReports(page);
 		const sent = page.waitForRequest(
 			(request) => request.url().endsWith('/api/client-errors') && request.method() === 'POST'
 		);
@@ -126,14 +146,114 @@ test.describe('a page that fails in the browser', () => {
 		await expectSiteFrame(page);
 
 		await sent;
-		const beacon = await page.waitForFunction(() => window.__beacon);
-		const report = JSON.parse((await beacon.jsonValue()) as string) as Record<string, string>;
+		const [report] = await reportsOnceThereAre(page, 1);
 		expect(report.message).toBe('Catalog request failed with status 500');
+		expect(report.source).toBe('navigation');
 		expect(report.path).toBe('/rendering/client');
 		// Browsers format a stack differently, and only some repeat the message in it.
 		expect(report.stack).toMatch(/_app\/immutable/);
 		// The reference on screen is the one the report was filed under.
 		await expect(page.getByText(`Reference ${report.reference}`)).toBeVisible();
+	});
+});
+
+/**
+ * Errors the router never sees: nothing on screen changes, so the report is the only trace. No page
+ * fails this way on purpose, so the tests cause the failures themselves.
+ */
+test.describe('an error in the browser outside navigation', () => {
+	test('an exception nothing caught is reported', async ({ page }) => {
+		await keepReports(page);
+		await page.goto('/reactivity');
+		await settle(page);
+
+		// From a timer, as an event handler's would be: thrown with nothing above it to catch it.
+		await page.evaluate(() => {
+			setTimeout(() => {
+				throw new Error('thrown in a handler');
+			});
+		});
+
+		const [report] = await reportsOnceThereAre(page, 1);
+		expect(report).toMatchObject({
+			source: 'error',
+			name: 'Error',
+			message: 'thrown in a handler',
+			path: '/reactivity',
+			route: '/reactivity'
+		});
+		expect(report.reference).toMatch(/^[0-9a-f]{12}$/);
+	});
+
+	test('a rejected promise nobody handled is reported', async ({ page }) => {
+		await keepReports(page);
+		await page.goto('/');
+		await settle(page);
+
+		await page.evaluate(() => {
+			void Promise.reject(new Error('nobody awaited this'));
+		});
+
+		const [report] = await reportsOnceThereAre(page, 1);
+		expect(report).toMatchObject({
+			source: 'unhandledrejection',
+			message: 'nobody awaited this',
+			path: '/'
+		});
+	});
+
+	test('code that keeps failing stops being reported', async ({ page }) => {
+		await keepReports(page);
+		await page.goto('/');
+		await settle(page);
+
+		await page.evaluate(
+			() =>
+				new Promise<void>((resolve) => {
+					for (let count = 1; count <= 25; count++) {
+						setTimeout(() => {
+							throw new Error(`failure ${count}`);
+						});
+					}
+					// Queued after the failures, so it runs after the last of them.
+					setTimeout(resolve, 100);
+				})
+		);
+
+		// The first ten, in whatever order the browser finished reading them back.
+		const reported = (await readReports(page)).map((report) => report.message);
+		expect(reported.sort()).toEqual(
+			Array.from({ length: 10 }, (_, index) => `failure ${index + 1}`).sort()
+		);
+	});
+
+	// SvelteKit creates the promise for streamed data when the app starts, and nothing listens to
+	// it until the page's components are rendered. Data that fails in between is, for a moment, a
+	// rejection nobody has handled, and the browser says so. It is not an error: the page shows the
+	// failure in the box reserved for it. Here the page's own code is held back until after the
+	// failing panel's two seconds, which makes that moment certain.
+	test('streamed data that fails before hydration is shown, and is not reported as an error', async ({
+		page
+	}) => {
+		const complaints: string[] = [];
+		page.on('pageerror', (error) => complaints.push(error.message));
+		page.on('console', (message) => {
+			if (message.type() === 'error') complaints.push(message.text());
+		});
+		await keepReports(page);
+		await page.route('**/_app/immutable/nodes/*.js', async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 3000));
+			await route.continue();
+		});
+
+		await page.goto('/data/streaming');
+		await settle(page);
+
+		await expect(page.getByRole('alert')).toContainText('Reviews service timed out.');
+		// Longer than the app waits after hydration before it calls an early rejection unhandled.
+		await page.waitForTimeout(1500);
+		expect(complaints).toEqual([]);
+		expect(await readReports(page)).toEqual([]);
 	});
 });
 

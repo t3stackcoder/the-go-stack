@@ -1,3 +1,4 @@
+import { brotliCompressSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
 import { auditedPages, settle } from './support.js';
 
@@ -45,6 +46,15 @@ const BASELINE: Record<string, { js: number; html: number }> = {
 /** Room for small changes, and for pages rendered per request, whose HTML differs a little each time. */
 const HEADROOM = 1.1;
 
+/**
+ * The most the document's <head> may weigh, in kilobytes, compressed. Nothing can be painted until
+ * the whole head has arrived, stylesheet included, and a server sends only so much before it waits
+ * to hear back from the browser: about 14 KB on a new connection, less behind some proxies. A head
+ * that outgrows that costs every first visit a round trip before first paint. Measured 2026-11-21
+ * at 9.1 KB, nearly all of it the inlined stylesheet.
+ */
+const MAX_HEAD = 12;
+
 const kilobytes = (bytes: number) => Math.round(bytes / 102.4) / 10;
 
 for (const route of auditedPages) {
@@ -57,7 +67,7 @@ for (const route of auditedPages) {
 			})
 		);
 
-		await page.goto(route);
+		const response = await page.goto(route);
 		await settle(page);
 
 		// Files are told apart by their address. The browser's own label for a request is not
@@ -91,9 +101,18 @@ for (const route of auditedPages) {
 			baseline.html * HEADROOM
 		);
 
-		// One font file: the Latin Inter. A second would mean a page has started using characters
-		// from another range, or another face has been added.
-		expect(requested('.woff2')).toHaveLength(1);
+		const html = await response!.text();
+		const head = html.slice(0, html.indexOf('</head>'));
+		expect(
+			kilobytes(brotliCompressSync(head).length),
+			'the <head>, compressed (KB)'
+		).toBeLessThanOrEqual(MAX_HEAD);
+
+		// One font file at most: the Latin Inter. A second would mean a page has started using
+		// characters from another range, or another face has been added. It can be none, when the
+		// test machine is busy enough that the server looks far away: the page then puts the font
+		// off until well after it has loaded (see src/app.html).
+		expect(requested('.woff2').length).toBeLessThanOrEqual(1);
 
 		// No stylesheet request: the styles are inlined into the HTML so that first paint does not
 		// wait for a second round trip. Past `inlineStyleThreshold` (vite.config.ts) SvelteKit

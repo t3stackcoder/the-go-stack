@@ -37,7 +37,21 @@ const { server } = /** @type {{ server: import('node:http').Server }} */ (
 	await import(new URL('./build/index.js', import.meta.url).href)
 );
 
+/**
+ * How long a browser may keep the font: a month, and after that it goes on using its copy while
+ * it fetches a new one in the background.
+ *
+ * Built files have their contents in their names and are kept for good. The font cannot be one of
+ * them, because the script in src/app.html has to name it before anything else on the page has
+ * been read, and that script's text is fixed by the content security policy. So the font has one
+ * address (static/fonts) and is cached by time. The adapter sends files from `static` with no
+ * instruction at all, which makes a browser ask about them on every visit. For the font that
+ * question costs a round trip the first frame does not wait for.
+ */
+const FONTS = 'public, max-age=2592000, stale-while-revalidate=31536000';
+
 // Ahead of the adapter's own listener, because that one may start writing the response at once.
-server.prependListener('request', (_request, response) => {
+server.prependListener('request', (request, response) => {
 	for (const [name, value] of Object.entries(HEADERS)) response.setHeader(name, value);
+	if (request.url?.startsWith('/fonts/')) response.setHeader('Cache-Control', FONTS);
 });

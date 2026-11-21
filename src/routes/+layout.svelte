@@ -4,12 +4,12 @@
 	import { onNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { settleEarlyRejections } from '#lib/browser-errors.js';
 	import Hud from '#lib/hud/Hud.svelte';
 	import { startMetrics } from '#lib/hud/metrics.svelte.js';
 	import { chapters } from '#lib/site/chapters.js';
 	import { markHydrated } from '#lib/stable/hydration.svelte.js';
 	import ThemeSwitch from '#lib/theme/ThemeSwitch.svelte';
-	import interLatin from '@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2?url';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -17,6 +17,7 @@
 	onMount(() => {
 		markHydrated();
 		startMetrics();
+		settleEarlyRejections();
 	});
 
 	// Cross-fade between pages instead of a hard cut. Shallow navigations change no content, and
@@ -40,18 +41,6 @@
 	const isCurrent = (path: string) =>
 		page.url.pathname === path || page.url.pathname.startsWith(`${path}/`);
 </script>
-
-<svelte:head>
-	<!--
-		The one font file every page needs for its first paint. It is declared `font-display: optional`
-		(see layout.css), which uses Inter only if the file is ready almost at once, so it is fetched
-		as early as possible. The Latin Extended file is left out on purpose: few pages use it.
-
-		It is written here, rather than through SvelteKit's `preload` hook, because that hook only
-		runs in production builds and the page should behave the same in development.
-	-->
-	<link rel="preload" href={interLatin} as="font" type="font/woff2" crossorigin="anonymous" />
-</svelte:head>
 
 <!--
 	The first thing a keyboard reaches: a way past the navigation that every page repeats. It is out

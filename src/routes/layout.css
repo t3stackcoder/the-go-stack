@@ -20,19 +20,54 @@
  * Inter, self-hosted. One variable file carries both the weight axis and the optical-size axis,
  * so "Inter" and "Inter Display" are the same download: `opsz` 14 is the text cut, 32 the display cut.
  *
- * Three things together keep text from re-flowing: `font-display: optional`, the preload in
- * +layout.svelte, and the script in app.html. Inter is used if it has loaded when the first frame
- * is drawn. Otherwise the page keeps the fallback for that visit, and the cached file is used from
- * the next page load on.
+ * The file is a cut of the package's own, with the weight axis narrowed to the weights in use,
+ * 400 to 700: 51 KB in place of 73 KB, on a file that first paint can wait for. Every character
+ * and feature is kept. A lighter or heavier weight is drawn at the nearest end of that range until
+ * the range is widened in app.html, here, and in scripts/subset-font.py, which makes the file.
  *
- * `optional` alone is enough in Chromium, which holds the first frame back briefly for a preloaded
- * font and never changes font afterwards. It is not enough elsewhere. Measured on a production
- * build with the font delayed by 0 to 1500 ms: Firefox laid text out a second time about 100 ms
- * after first paint, and WebKit swapped the fallback for Inter on the first client-side navigation
- * after a slow load. So the script takes the decision out of the browser's hands: at the first
- * frame, if Inter has not loaded, it marks the page (`data-font="fallback"`, styled further down)
- * and Inter leaves the font stack for the rest of the visit. e2e/fonts.e2e.ts holds all three
- * browsers to one font per visit.
+ * That file is not declared here. The script in app.html declares it and asks for it, from the
+ * top of the <head>, because a rule down here is read too late: behind a proxy this stylesheet
+ * arrived a round trip after the start of the page. What follows is the second file, for Latin
+ * Extended, which is left to the browser, and the fallback.
+ *
+ * Two things together keep text from re-flowing: `font-display: optional`, and that script, which
+ * asks for the font before anything is drawn. Inter is used if it has loaded when
+ * the first frame is drawn. Otherwise the page keeps the fallback for that visit, and the cached
+ * file is used from the next page load on.
+ *
+ * `optional` alone is enough in Chromium, which holds the first frame back briefly for a font
+ * asked for in the <head> and never changes font afterwards. It is not enough elsewhere. Measured
+ * on a production build with the font delayed by 0 to 1500 ms: Firefox laid text out a second time
+ * about 100 ms after first paint, and WebKit swapped the fallback for Inter on the first
+ * client-side navigation after a slow load. So the script takes the decision out of the browser's
+ * hands: at the first frame, if Inter has not loaded, it marks the page (`data-font="fallback"`,
+ * styled further down) and Inter leaves the font stack for the rest of the visit.
+ * e2e/fonts.e2e.ts holds all three browsers to one font per visit.
+ *
+ * Chromium's hold has a price: about 100 ms of first paint, paid whether or not the font arrives.
+ * So the script only asks when the font can make it: on a later visit, when the file should be in
+ * the cache (the script notes in localStorage that this browser has asked for it before), or when
+ * the server is close. Otherwise it takes the fallback at once, and fetches the font for next time
+ * three seconds after the page has loaded. Not sooner, because a font the page asks for is sent
+ * ahead of scripts: fetched at load over HTTP/1.1, it made the page slower to respond than it had
+ * been before any of this (941 ms against 793 ms after the HTML, at a 150 ms round trip).
+ *
+ * "Close" is a server that answered the page within 35 ms. The answer time is read from the
+ * browser's own record of the page load, less the rendering time the server reports in its
+ * Server-Timing header, and it runs a few milliseconds over the network's round trip. The figure
+ * was measured on 2026-11-21, on first visits with real network delay between a browser and this
+ * server in containers. The font shares the connection with the page's scripts, and arrived three
+ * round trips after it was asked for behind an HTTP/2 proxy, four over HTTP/1.1. Behind the proxy
+ * it made the first frame every time up to a round trip of 35 ms and never at 40 ms, so the
+ * cut-off asks up to a round trip of about 28 ms. Reached directly over HTTP/1.1 it made the
+ * first frame up to 20 ms, so between there and the cut-off such a visit waits for nothing.
+ *
+ * What that buys, from the connection opening to first paint on a first visit behind the proxy:
+ * 239 ms before and 148 ms now at a 30 ms round trip, 539 and 435 at 100 ms. Inside the cut-off
+ * the page still waits for Inter and starts in it, about 205 ms at a 25 ms round trip.
+ *
+ * That is also why there is no <link rel="preload"> for the font. A preload link holds the first
+ * frame in the same way, and it cannot be made conditional.
  *
  * (The development server can show a tiny shift of its own, because it re-injects this
  * stylesheet after load.)
@@ -40,19 +75,8 @@
 @font-face {
 	font-family: 'Inter';
 	font-style: normal;
-	font-weight: 100 900;
-	font-display: optional;
-	src: url('@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2')
-		format('woff2-variations');
-	unicode-range:
-		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-	font-family: 'Inter';
-	font-style: normal;
-	font-weight: 100 900;
+	/* The package's file goes further, but the two files must agree on what a weight means. */
+	font-weight: 400 700;
 	font-display: optional;
 	src: url('@fontsource-variable/inter/files/inter-latin-ext-opsz-normal.woff2')
 		format('woff2-variations');

@@ -19,7 +19,8 @@ it re-inserts the stylesheet after load, which can show as a tiny layout shift i
 readout that the production build does not have.
 
 `pnpm start` runs `server.js`, which starts the server the Node adapter built and adds the
-security headers. Running `node build` directly serves the same site without them.
+security headers and the font's cache rule. Running `node build` directly serves the same site
+without them.
 
 ## Checking it
 
@@ -58,9 +59,9 @@ behave.
 | `src/error.html`            | The last-resort error page, sent when the app's own error page cannot be rendered.                   |
 | `src/env.ts`                | The environment variables the app reads, typed and checked when the server starts.                   |
 | `src/hooks.server.ts`       | Compression for pages rendered per request, and the record of every server error.                    |
-| `src/hooks.client.ts`       | Reports errors that happen in the browser to the server.                                             |
+| `src/hooks.client.ts`       | Reports errors that happen in the browser to the server, through `src/lib/browser-errors.ts`.        |
 | `src/routes/layout.css`     | Design tokens (OKLCH, a light and a dark value each), fonts, and shared component styles.            |
-| `src/routes/+layout.svelte` | The site frame: skip link, navigation, font preload, page transitions, the readout.                  |
+| `src/routes/+layout.svelte` | The site frame: skip link, navigation, page transitions, the readout.                                |
 | `src/routes/+error.svelte`  | The error page, shown inside the site frame for a missing page or a failure.                         |
 | `src/lib/stable/`           | The layer that keeps pages from moving: the hydration flag, reserved boxes, and the image component. |
 | `src/lib/hud/`              | The on-page readout and the measurements behind it.                                                  |
@@ -68,8 +69,9 @@ behave.
 | `src/lib/demo/`             | The demos, one folder per chapter.                                                                   |
 | `src/lib/site/chapters.ts`  | The list of chapters. Navigation, home page and "next" links come from it.                           |
 | `plugins/highlight.ts`      | Lets a page import the highlighted source of a real file with `?highlight`.                          |
-| `server.js`                 | The production entry point: the built server, plus security headers on every response.               |
+| `server.js`                 | The production entry point: the built server, plus security headers and the font's cache rule.       |
 | `vite.config.ts`            | Build configuration, including the content security policy.                                          |
+| `scripts/subset-font.py`    | Makes the font file in `static/fonts/` from the Inter package. Run by hand, rarely.                  |
 | `e2e/`                      | Browser tests. `stability.e2e.ts` is the audit; `support.ts` holds its tools.                        |
 | `e2e/budgets.e2e.ts`        | The weight each page is allowed, in bytes and requests.                                              |
 | `Dockerfile`                | The production container image.                                                                      |
@@ -130,3 +132,7 @@ for timeouts and for the headers a proxy uses to pass on the visitor's address.
 - **TLS.** The server speaks plain HTTP. Whatever terminates TLS in front of it is also where
   `Strict-Transport-Security` belongs, and where requests to `/api/client-errors` should be
   rate-limited.
+- **HTTP/2.** That proxy should speak HTTP/2 or HTTP/3 to browsers. This server speaks HTTP/1.1,
+  over which a browser fetches a page's script files six at a time: on a first visit at a 150 ms
+  round trip the page could respond about 790 ms after its HTML began to arrive when reached
+  directly, and about 500 ms behind an HTTP/2 proxy.

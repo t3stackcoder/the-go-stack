@@ -5,12 +5,11 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
 		<meta name="color-scheme" content="light dark" />
-		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
-		%sveltekit.head%
 		<!--
-			Runs before first paint, and after the stylesheet above so that the font it asks about
-			has been declared. It settles two things the server cannot know: the theme (rationale
-			in src/lib/theme/ThemeSwitch.svelte) and the font (rationale in src/routes/layout.css).
+			Runs before first paint, and ahead of everything SvelteKit adds to the head, so that
+			it is in the first piece of the page to arrive. It settles two things the server
+			cannot know: the theme (rationale in src/lib/theme/ThemeSwitch.svelte) and the font
+			(rationale in src/routes/layout.css).
 		-->
 		<script>
 			(() => {
@@ -43,14 +42,55 @@
 				});
 
 				// The font for this visit is settled when the first frame is drawn: Inter if it has
-				// loaded by then, the fallback from then on if it has not. Asking for it here starts
-				// the download before anything on the page has had the chance to.
-				document.fonts.load('1em Inter').catch(() => {});
-				requestAnimationFrame(() => {
-					if (!document.fonts.check('1em Inter')) root.dataset.font = 'fallback';
+				// loaded by then, the fallback from then on if it has not. The font is declared
+				// here and not in the stylesheet, which arrives too late to ask from.
+				const inter = new FontFace('Inter', "url(/fonts/inter-latin.woff2) format('woff2')", {
+					weight: '400 700',
+					display: 'optional',
+					unicodeRange:
+						'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD'
 				});
+				const useFallback = () => (root.dataset.font = 'fallback');
+				const fetchInter = () => {
+					inter.load().catch(() => {});
+					try {
+						localStorage.setItem('font-asked', '1');
+					} catch {}
+				};
+
+				// Asking here makes Chromium hold the first frame for the font, so only ask when it
+				// can arrive in time: it is cached, or the server is close. Otherwise take the
+				// fallback now and fetch the font after load, for next time. (This script is sent
+				// with every page, so the reasoning and the figures are kept in layout.css.)
+				let cached = true; // If storage cannot be read, it may be cached.
+				try {
+					cached = localStorage.getItem('font-asked');
+				} catch {}
+
+				// How long the server took to answer, less the time it says it spent rendering.
+				const [entry] = performance.getEntriesByType('navigation');
+				const roundTrip = entry
+					? entry.responseStart -
+						entry.requestStart -
+						(entry.serverTiming?.find((timing) => timing.name === 'render')?.duration ?? 0)
+					: 0;
+
+				if (cached || roundTrip < 35) {
+					document.fonts.add(inter);
+					fetchInter();
+					requestAnimationFrame(() => {
+						if (inter.status !== 'loaded') useFallback();
+					});
+				} else {
+					useFallback();
+					// Not at once: the font is not for this visit, and fetched now it would be
+					// sent ahead of the scripts the page is still waiting for.
+					addEventListener('load', () => setTimeout(fetchInter, 3000));
+				}
 			})();
 		</script>
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>

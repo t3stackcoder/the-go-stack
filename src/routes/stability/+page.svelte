@@ -75,12 +75,12 @@
 				ship no JavaScript.
 			</li>
 			<li>
-				<strong>The font.</strong> Inter is preloaded and declared
-				<code>font-display: optional</code>, and the same inline script settles the rest: if Inter
-				has loaded when the first frame is drawn, it is used, and if it has not, it is out of the
-				running until the next page load. Either way the font you start with is the font you keep.
-				The fallback is Arial reshaped to Inter's measurements, so running text takes up about the
-				same room in both.
+				<strong>The font.</strong> Inter is declared
+				<code>font-display: optional</code>, and the same inline script asks for it and settles the
+				rest: if Inter has loaded when the first frame is drawn, it is used, and if it has not, it
+				is out of the running until the next page load. Either way the font you start with is the
+				font you keep. The fallback is Arial reshaped to Inter's measurements, so running text takes
+				up about the same room in both.
 			</li>
 		</ul>
 	</section>
@@ -225,9 +225,10 @@
 		<ul>
 			<li>
 				<strong>The font choice has a price.</strong> A first visit may be read in the fallback font until
-				the next page load. Chromium holds its first frame back a moment for a preloaded font, so there
-				it takes a slow connection. Firefox does not wait, so there it is most first visits. That is the
-				trade: a plainer typeface for one visit, in exchange for text that never jumps.
+				the next page load. Chromium holds its first frame back a moment for the font, and the page only
+				asks it to when the server is close enough for the font to arrive in that moment, so there it
+				takes a slow or distant connection. Firefox does not wait, so there it is most first visits. That
+				is the trade: a plainer typeface for one visit, in exchange for text that never jumps.
 			</li>
 			<li>
 				<strong>Layout shift is measured in Chromium only.</strong> No other browser reports it to a page,
