@@ -1,4 +1,4 @@
-import { brotliCompressSync } from 'node:zlib';
+import { brotliCompressSync, constants } from 'node:zlib';
 import { expect, test } from '@playwright/test';
 import { auditedPages, settle } from './support.js';
 
@@ -49,11 +49,31 @@ const HEADROOM = 1.1;
 /**
  * The most the document's <head> may weigh, in kilobytes, compressed. Nothing can be painted until
  * the whole head has arrived, stylesheet included, and a server sends only so much before it waits
- * to hear back from the browser: about 14 KB on a new connection, less behind some proxies. A head
- * that outgrows that costs every first visit a round trip before first paint. Measured 2026-11-21
- * at 9.1 KB, nearly all of it the inlined stylesheet.
+ * to hear back from the browser. A head that outgrows that costs every first visit a round trip
+ * before first paint.
+ *
+ * That allowance is a number of packets, not of bytes: ten on a new connection, unless whoever
+ * runs the machine has raised it. What ten packets carry depends on who fills them. Read from
+ * packet captures on 2026-11-21:
+ *
+ * - This server, reached directly, fills all ten: about 14 KB.
+ * - An HTTP/2 proxy in front of it (Caddy) spends four of the ten on small frames of its own, and
+ *   about 8 KB of the page gets out. No head on this site fits in that, and no budget here could
+ *   make one fit: with every style a page does not use taken out, the lightest was still 7 KB.
+ * - The same proxy allowed sixteen packets, which is what README.md asks of a deployment, gets
+ *   about 16 KB out.
+ *
+ * Twelve is inside the first and the third. The second is the proxy's to fix.
  */
 const MAX_HEAD = 12;
+
+/**
+ * The head as the server would send it. A page rendered per request is compressed at this
+ * quality (src/hooks.server.ts) and a prerendered one harder, so this is the heavier of the two:
+ * 10.1 KB at most when the budget was set, nearly all of it the inlined stylesheet.
+ */
+const asSent = (text: string) =>
+	brotliCompressSync(text, { params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }).length;
 
 const kilobytes = (bytes: number) => Math.round(bytes / 102.4) / 10;
 
@@ -103,10 +123,7 @@ for (const route of auditedPages) {
 
 		const html = await response!.text();
 		const head = html.slice(0, html.indexOf('</head>'));
-		expect(
-			kilobytes(brotliCompressSync(head).length),
-			'the <head>, compressed (KB)'
-		).toBeLessThanOrEqual(MAX_HEAD);
+		expect(kilobytes(asSent(head)), 'the <head>, compressed (KB)').toBeLessThanOrEqual(MAX_HEAD);
 
 		// One font file at most: the Latin Inter. A second would mean a page has started using
 		// characters from another range, or another face has been added. It can be none, when the

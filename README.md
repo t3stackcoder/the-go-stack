@@ -136,3 +136,12 @@ for timeouts and for the headers a proxy uses to pass on the visitor's address.
   over which a browser fetches a page's script files six at a time: on a first visit at a 150 ms
   round trip the page could respond about 790 ms after its HTML began to arrive when reached
   directly, and about 500 ms behind an HTTP/2 proxy.
+- **First flight.** The machine that ends TCP in front of the visitor should be allowed at least
+  16 packets at the start of a connection. The default is 10, and an HTTP/2 proxy spends some of
+  those on frames of its own: behind Caddy about 8 KB of a page got out before the proxy had to
+  wait for the browser, which is less than any page's `<head>`, so nothing was painted until a
+  second round trip. On Linux the allowance is `initcwnd`, set on the route:
+  `ip route change default via <gateway> dev <interface> initcwnd 16`. Measured in Chromium at a
+  100 ms round trip, first paint came about 430 ms after the connection opened with 10 packets and
+  about 360 ms with 16, on every page; with 32 every page arrived whole. The price is a larger
+  burst at the start of each connection. Behind a CDN the setting is the CDN's.

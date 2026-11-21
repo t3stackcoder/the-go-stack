@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { holdLateArrivals } from './support.js';
 
 const answers = {
 	'What are you building?': 'A web product with public pages and an application behind them',
@@ -73,6 +74,58 @@ test('answering does not add history entries or lose the scroll position', async
 	// Six answers, one history entry: Back leaves the page instead of undoing one answer.
 	await page.goBack();
 	await expect(page).toHaveURL('/');
+});
+
+test('answers given before the page has hydrated are kept, and counted once it has', async ({
+	page
+}) => {
+	const release = await holdLateArrivals(page);
+
+	// One question is already answered in the address, so both cases are here: an answer changed
+	// and an answer given, each before any of the app's JavaScript has arrived.
+	await page.goto('/verdict?building=content', { waitUntil: 'domcontentloaded' });
+	const historyLength = await page.evaluate(() => history.length);
+
+	const product = page.getByLabel(answers['What are you building?']);
+	const react = page.getByLabel(answers['What does your team know today?']);
+	await product.check();
+	await react.check();
+	// Nothing is listening yet, so the verdict is still the one the server sent.
+	await expect(verdict(page)).toContainText('1 of 6 answered');
+
+	release();
+
+	// Hydration leaves the form as the visitor left it, and the address catches up with it
+	// without a new page or a new history entry.
+	await expect(verdict(page)).toContainText('2 of 6 answered');
+	await expect(page).toHaveURL(/\?building=product&team=react$/);
+	await expect(product).toBeChecked();
+	await expect(react).toBeChecked();
+	expect(await page.evaluate(() => history.length)).toBe(historyLength);
+});
+
+test('the form follows the address when something else changes it', async ({ page }) => {
+	const ticked = page.locator('main form').getByRole('radio', { checked: true });
+
+	await page.goto('/verdict');
+	await answerEverything(page);
+	await expect(verdict(page).getByRole('heading', { level: 2 })).toBeVisible();
+
+	// The chapter's own link in the navigation: the same page with no answers, as a new entry.
+	await page
+		.getByRole('navigation', { name: 'Chapters' })
+		.getByRole('link', { name: 'Verdict' })
+		.click();
+	await expect(verdict(page)).toContainText('0 of 6 answered');
+	await expect(ticked).toHaveCount(0);
+
+	await page.goBack();
+	await expect(verdict(page).getByRole('heading', { level: 2 })).toBeVisible();
+	await expect(ticked).toHaveCount(6);
+
+	await page.getByRole('link', { name: 'Start again' }).click();
+	await expect(verdict(page)).toContainText('0 of 6 answered');
+	await expect(ticked).toHaveCount(0);
 });
 
 test('works with JavaScript switched off', async ({ browser }) => {

@@ -22,13 +22,20 @@ The foundation is built and its tests pass. This is what is still open, most imp
    on one machine, behind one proxy (Caddy) and directly over HTTP/1.1. It was not measured on a
    limited connection, behind a CDN, or over HTTP/3. On a deployed site, look at how often a first
    visit in Chrome starts in Inter, and how long first paint waits when it does.
-4. **Put real photographs through the image pipeline.** The demo images are flat generated
+4. **Check the first flight on the deployed proxy.** Whether a page is painted after one round
+   trip or two depends on how many packets the machine in front of the visitor sends before it
+   waits to hear back (see 19). That was measured behind one proxy (Caddy 2.11) in a container,
+   with the allowance set by hand. It was not measured behind any other proxy, or behind a CDN,
+   where the setting is the CDN's. On a deployed site, time a first visit from far away: at a
+   100 ms round trip first paint came about 360 ms after the connection opened when the head
+   arrived in the first flight, and about 430 ms when it did not.
+5. **Put real photographs through the image pipeline.** The demo images are flat generated
    illustrations and compress far better than a photograph does. The weights on
    `/stability/images` say little about what a real page of images will cost.
 
 ## Decisions for the owner
 
-5. **Whether the font trade is the right one.** The font is settled at the first frame, so that
+6. **Whether the font trade is the right one.** The font is settled at the first frame, so that
    no browser changes it mid-visit. The price is that Firefox shows the fallback on most first
    visits, and Inter only once the file is cached. The alternative is Inter more often and text
    that moves after first paint in Firefox and WebKit. The evidence is in the comment above the
@@ -45,47 +52,56 @@ The foundation is built and its tests pass. This is what is still open, most imp
    not built or measured. By the sizes involved it would cost every first visit one or two more
    round trips before first paint.
 
-6. **Whether `/stability/failure` should ship.** It throws on purpose so that the 500 page can be
+7. **Whether `/stability/failure` should ship.** It throws on purpose so that the 500 page can be
    shown and tested. Every visit writes a real error to the production log. Keep it and filter it
    out where logs are read, or remove the page and lose the end-to-end test of a server failure.
-7. **What comes after the foundation.** A real application slice (sign-in, a database, lists,
+8. **What comes after the foundation.** A real application slice (sign-in, a database, lists,
    editing) and a shared component library were both left out on purpose. Neither has been
    started or designed.
 
 ## Known gaps
 
-8. **Browser error reports are not filtered.** `src/lib/browser-errors.ts` reports every uncaught
+9. **Browser error reports are not filtered.** `src/lib/browser-errors.ts` reports every uncaught
    exception and unhandled rejection, up to ten for each page load. On a public site that will
    include errors thrown by browser extensions, which nothing here tells apart from the app's
    own. A rejection from before hydration is reported one second after hydration, and is lost if
    the visitor leaves in that second.
-9. **The font is cached by time, not by name.** The script in `src/app.html` has to name the font
-   before anything else on the page is read, and the content security policy fixes that script's
-   text, so the address (`/fonts/inter-latin.woff2`) cannot carry a version. `server.js` lets a
-   browser keep the file for 30 days and then refresh it in the background. A new cut of the font
-   therefore reaches a returning visitor up to a month late. A browser that does not refresh in
-   the background asks the server once a month instead, and may start that one visit in the
-   fallback. Whether Safari is one was not checked. The
-   address also assumes the site is served from the root: a base path would have to be added to
-   it by hand. Run with `node build` instead of `server.js`, the font has no cache rule at all.
-10. **The second font file is left to the browser.** Inter's Latin Extended file loads on demand
+10. **The font is cached by time, not by name.** The script in `src/app.html` has to name the font
+    before anything else on the page is read, and the content security policy fixes that script's
+    text, so the address (`/fonts/inter-latin.woff2`) cannot carry a version. `server.js` lets a
+    browser keep the file for 30 days and then refresh it in the background. A new cut of the font
+    therefore reaches a returning visitor up to a month late. A browser that does not refresh in
+    the background asks the server once a month instead, and may start that one visit in the
+    fallback. Whether Safari is one was not checked. The address also assumes the site is served
+    from the root: a base path would have to be added to it by hand. Run with `node build`
+    instead of `server.js`, the font has no cache rule at all.
+11. **The second font file is left to the browser.** Inter's Latin Extended file loads on demand
     under `font-display: optional` alone, without the first-frame rule. No page uses those
     characters today, and the one-font budget fails if one starts to. A page that needs them needs
     a decision first.
-11. **The fallback font fits body text better than headings.** The header title measured 141 px
+12. **The fallback font fits body text better than headings.** The header title measured 141 px
     in Inter, against 149 px (Chromium) and 160 px (WebKit) in the fallback. Nothing moves,
     because the font never changes mid-visit, but a visit in the fallback looks different at
     heading sizes. Weight-specific fallback faces would narrow the gap.
-12. **Embeds, video and CSS background images have no mechanism.** `Image` covers `<img>` only.
+13. **Embeds, video and CSS background images have no mechanism.** `Image` covers `<img>` only.
     The first page that needs an embed needs the same treatment: a box sized before the content
     arrives, and a broken case to prove the audit catches one without it.
-13. **Three chapters' factual claims were never checked against documentation**: Reactivity,
+14. **Three chapters' factual claims were never checked against documentation**: Reactivity,
     Data and Forms. Their tests pass and their pages were reviewed, but the copy was read for
     plausibility only.
+15. **Text typed before hydration is lost on two pages.** The search box on `/data/search` and the
+    fields of the packing list on `/forms` are written with `value={...}`, and hydration sets
+    such a field back to what the server sent. Checked by holding the page's scripts back, typing,
+    and letting them go: the text was gone. The Verdict page had the same fault in its radios,
+    which is what made one of its tests fail now and then, and no longer has it
+    (`src/routes/verdict/+page.svelte`): the form keeps what the visitor entered, the address
+    supplies the defaults, and once the page has hydrated it sends the form if the two differ.
+    The search box needs the same. The packing list needs at least the first part. Neither was
+    tried.
 
 ## Worth investigating
 
-14. **Over HTTP/1.1 a page's script files queue. Over HTTP/2 they do not.** A page asks for two
+16. **Over HTTP/1.1 a page's script files queue. Over HTTP/2 they do not.** A page asks for two
     dozen or so script files, and a browser sends six at a time to a server that speaks HTTP/1.1, as
     this one does. Measured on a first visit at a 150 ms round trip: the page could respond about
     790 ms after its HTML began to arrive when the browser reached the server directly, and about
@@ -94,20 +110,6 @@ The foundation is built and its tests pass. This is what is still open, most imp
     weight, and was taken out again: with any group of its own in place, an error page reached by
     a link was loaded as a new document instead of being shown by the router, and the cause was
     not found. It made no difference behind the proxy in any case.
-15. **Behind a proxy that starts a connection slowly, nothing paints until a second round trip.**
-    Nothing can be painted until the whole `<head>` has arrived, and it weighs 9 KB compressed,
-    7.5 KB of it the inlined stylesheet. A server sends only so much before it waits to hear from
-    the browser: about 14 KB on a new connection, and less behind some proxies. Reached directly,
-    this server delivered the page in one piece. Behind the proxy used for these measurements
-    (Caddy) the head took two, on every first visit measured, so the first piece there carries
-    less than 9 KB. Why was not established. `e2e/budgets.e2e.ts` now holds the head
-    under 12 KB, which keeps it inside the larger figure. Getting inside the smaller one means a
-    lighter stylesheet, and the stylesheet is nearly all Tailwind utilities for the whole site.
-16. **One Verdict test fails about one run in ten in WebKit when the machine is busy.**
-    `answering does not add history entries or lose the scroll position`
-    (`e2e/verdict.e2e.ts`) failed at least 4 times in 30 on the code as committed, and 3 in 30
-    after these changes, with the whole suite's worth of browsers running beside it. Alone it
-    passes. It was not investigated.
 17. **A Node assertion message appears now and then on Windows** after the test
     `a compressed page still arrives in pieces`
     (`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`). The test passes. It was not
@@ -117,10 +119,33 @@ The foundation is built and its tests pass. This is what is still open, most imp
 
 ## Outside the repository
 
-19. **The proxy in front of the server has three jobs the app leaves to it:** sending
+19. **The proxy in front of the server has four jobs the app leaves to it:** sending
     `Strict-Transport-Security`, limiting how often one client may post to `/api/client-errors`
     (the app's own code stops at ten reports for each page load, which does nothing about a client
-    that is not the app), and speaking HTTP/2 or HTTP/3 to browsers (see 14).
+    that is not the app), speaking HTTP/2 or HTTP/3 to browsers (see 16), and sending enough of a
+    page in its first flight.
+
+    The last one is what held first paint back by a round trip behind the proxy. A machine sends
+    ten packets on a new connection before it waits to hear from the browser. Reached directly,
+    this server fills all ten, about 14 KB, and a page arrived in one piece. Caddy, speaking
+    HTTP/2, spent four of the ten on small frames of its own and got about 8 KB of the page out.
+    The `<head>` of every page is 9 to 10 KB as sent, and nothing can be painted until all of it
+    has arrived. In Chromium at a 100 ms round trip, first paint came about 430 ms after the
+    connection opened, on every page. With the proxy allowed 16 packets (`initcwnd` on its route)
+    every head arrived in the first flight and first paint came at about 360 ms; with 32 every
+    page arrived whole. `README.md` gives the setting. It was read from packet captures and timed
+    in Chromium, on 2026-11-21, with real delay between containers.
+
+    The app cannot do this instead. The head is nearly all stylesheet, and with every style a
+    page does not use taken out it would still weigh 7 to 8 KB. That was estimated and not built:
+    it would not have been enough, and it would have meant a stylesheet for each page.
+    `e2e/budgets.e2e.ts` holds the head under 12 KB, which is inside what this server sends
+    directly and inside what a proxy allowed 16 packets sends.
+
+    The font figures in 6 and in `src/routes/layout.css` were measured with the proxy at ten
+    packets. At 32, a first visit that waits for the font painted 7 to 33 ms sooner (at
+    round trips of 10, 25 and 30 ms), and the font rule made the same choice at every round trip
+    tried.
 
 ## Before you start
 

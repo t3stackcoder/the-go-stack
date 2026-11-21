@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { questions, type Outcome } from '#lib/demo/verdict/decide.js';
 	import Chapter from '#lib/ui/Chapter.svelte';
@@ -7,6 +9,36 @@
 	let { data }: PageProps = $props();
 
 	const answered = $derived(Object.keys(data.answers).length);
+
+	/*
+	 * What is ticked belongs to the form, as it does with JavaScript switched off. The address
+	 * gives each radio its default (`defaultChecked` in the template), and the browser keeps what
+	 * the visitor ticks. Written as `checked` instead, hydration sets every radio back to what the
+	 * server sent, and an answer given while the page was still loading is lost.
+	 *
+	 * That leaves two moments when the form and the address disagree, and both are settled here.
+	 */
+	let form: HTMLFormElement;
+
+	// The address changed and the form was not the cause (Start again, Back). The radios have their
+	// new defaults by now, and a reset is what shows them.
+	afterNavigate(({ type }) => {
+		if (type !== 'enter' && type !== 'form') form.reset();
+	});
+
+	// An answer ticked before hydration is on the form and not in the address: nothing was
+	// listening when it changed. Send the form now, as a change would have.
+	onMount(() => {
+		// Not at once. The router starts listening for forms just after the page has mounted, and
+		// sent before then the form would go the browser's own way: a new page, a new history entry.
+		const timer = setTimeout(() => {
+			const ticked = new FormData(form);
+			if (questions.some(({ id }) => (ticked.get(id) ?? undefined) !== data.answers[id])) {
+				form.requestSubmit();
+			}
+		});
+		return () => clearTimeout(timer);
+	});
 
 	const outcomes: Record<Outcome, { title: string; summary: string; next: string; tone: string }> =
 		{
@@ -44,6 +76,7 @@
 		scroll position and focus and replaces the history entry instead of adding one.
 	-->
 	<form
+		bind:this={form}
 		method="GET"
 		data-sveltekit-reset="false"
 		data-sveltekit-replacestate
@@ -66,7 +99,7 @@
 									type="radio"
 									name={question.id}
 									value={option.value}
-									checked={data.answers[question.id] === option.value}
+									defaultChecked={data.answers[question.id] === option.value}
 									onchange={(event) => event.currentTarget.form?.requestSubmit()}
 									class="mt-1 size-4 shrink-0 accent-accent"
 								/>
