@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="text-scale" content="scale" />
+		<meta name="color-scheme" content="light dark" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		%sveltekit.head%
+		<!--
+			Runs before first paint, and after the stylesheet above so that the font it asks about
+			has been declared. It settles two things the server cannot know: the theme (rationale
+			in src/lib/theme/ThemeSwitch.svelte) and the font (rationale in src/routes/layout.css).
+		-->
+		<script>
+			(() => {
+				const root = document.documentElement;
+
+				const apply = (theme) => {
+					if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
+					else delete root.dataset.theme;
+				};
+
+				// Storage can be unavailable (blocked cookies, some private modes). The theme then
+				// simply follows the system and is not persisted, which is the correct degradation.
+				try {
+					apply(localStorage.getItem('theme'));
+				} catch {}
+
+				addEventListener('click', (event) => {
+					const theme = event.target.closest?.('[data-theme-set]')?.dataset.themeSet;
+					if (!theme) return;
+					apply(theme);
+					try {
+						if (theme === 'system') localStorage.removeItem('theme');
+						else localStorage.setItem('theme', theme);
+					} catch {}
+				});
+
+				// Keep other open tabs in step.
+				addEventListener('storage', (event) => {
+					if (event.key === 'theme') apply(event.newValue);
+				});
+
+				// The font for this visit is settled when the first frame is drawn: Inter if it has
+				// loaded by then, the fallback from then on if it has not. Asking for it here starts
+				// the download before anything on the page has had the chance to.
+				document.fonts.load('1em Inter').catch(() => {});
+				requestAnimationFrame(() => {
+					if (!document.fonts.check('1em Inter')) root.dataset.font = 'fallback';
+				});
+			})();
+		</script>
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

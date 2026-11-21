@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light dark" />
+		<title>Error %sveltekit.status%</title>
+		<!--
+			The last resort: sent when the error page itself could not be rendered, so it can rely on
+			nothing the app builds. The colours are copied from src/routes/layout.css, and the script
+			applies a stored theme the same way src/app.html does.
+		-->
+		<script>
+			try {
+				const theme = localStorage.getItem('theme');
+				if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+			} catch {}
+		</script>
+		<style>
+			html {
+				color-scheme: light dark;
+				background-color: light-dark(oklch(0.985 0.003 265), oklch(0.16 0.012 265));
+				color: light-dark(oklch(0.21 0.02 265), oklch(0.96 0.005 265));
+				font-family: ui-sans-serif, system-ui, sans-serif;
+				-webkit-font-smoothing: antialiased;
+			}
+
+			html[data-theme='light'] {
+				color-scheme: light;
+			}
+
+			html[data-theme='dark'] {
+				color-scheme: dark;
+			}
+
+			body {
+				max-width: 44rem;
+				margin: 0 auto;
+				padding: 5rem 1.5rem;
+			}
+
+			.status {
+				margin: 0;
+				color: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
+				font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+				font-size: 0.875rem;
+			}
+
+			h1 {
+				margin: 1.25rem 0 0;
+				font-size: 2.25rem;
+				line-height: 1.1;
+				font-weight: 600;
+				letter-spacing: -0.02em;
+			}
+
+			.message {
+				margin: 1.5rem 0 0;
+				color: light-dark(oklch(0.45 0.02 265), oklch(0.74 0.015 265));
+				font-size: 1.25rem;
+				line-height: 1.6;
+			}
+
+			a {
+				color: inherit;
+			}
+		</style>
+	</head>
+	<body>
+		<p class="status">Error %sveltekit.status%</p>
+		<h1>This page could not be shown</h1>
+		<p class="message">%sveltekit.error.message%</p>
+		<p class="message"><a href="/">Back to the start</a></p>
+	</body>
+</html>
