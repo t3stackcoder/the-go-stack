@@ -4,10 +4,10 @@
 -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { resolve } from '$app/paths';
 	import CatalogGrid from '#lib/demo/CatalogGrid.svelte';
 	import type { Product } from '#lib/demo/catalog.js';
 	import Code from '#lib/ui/Code.svelte';
+	import { resolve } from '$app/paths';
 
 	const modes = [
 		{ path: '/rendering/server', label: 'Server only', tab: 'Server only' },
@@ -44,7 +44,7 @@
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-6 pt-10 pb-12">
-	<a href={resolve('/rendering')} class="font-mono text-sm text-accent-text hover:underline">
+	<a href={resolve('/rendering')} class="font-mono text-sm text-brand-text hover:underline">
 		← Chapter 01 · Rendering
 	</a>
 
@@ -83,7 +83,7 @@
 			<ul class="mt-3 space-y-2 text-ink-muted">
 				{#each notice as item (item)}
 					<li class="flex gap-3">
-						<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+						<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
 						{item}
 					</li>
 				{/each}

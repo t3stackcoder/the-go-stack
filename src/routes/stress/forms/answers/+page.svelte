@@ -56,9 +56,10 @@
 		<p id="note-error" class="mt-1 h-5 truncate text-bad">{save.answer?.errors?.note ?? ''}</p>
 
 		<button
+			type="submit"
 			data-busy={save.busy}
 			aria-disabled={save.busy}
-			class="mt-3 h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink aria-disabled:cursor-progress"
+			class="mt-3 h-10 rounded-lg bg-brand px-4 font-semibold text-brand-ink aria-disabled:cursor-progress"
 		>
 			Send
 		</button>

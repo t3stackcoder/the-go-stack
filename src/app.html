@@ -27,14 +27,37 @@
 					apply(localStorage.getItem('theme'));
 				} catch {}
 
-				addEventListener('click', (event) => {
-					const theme = event.target.closest?.('[data-theme-set]')?.dataset.themeSet;
-					if (!theme) return;
+				const choose = (theme) => {
+					if (theme === (root.dataset.theme ?? 'system')) return;
 					apply(theme);
 					try {
 						if (theme === 'system') localStorage.removeItem('theme');
 						else localStorage.setItem('theme', theme);
 					} catch {}
+				};
+
+				addEventListener('click', (event) => {
+					const theme = event.target.closest?.('[data-theme-set]')?.dataset.themeSet;
+					if (theme) choose(theme);
+				});
+
+				// The switch also slides: press anywhere on it and move across it, and the theme
+				// follows the pointer from segment to segment until it is let go.
+				addEventListener('pointerdown', (event) => {
+					const group = event.target.closest?.('[data-theme-group]');
+					if (!group) return;
+					const follow = ({ clientX, clientY }) => {
+						const option = document.elementFromPoint(clientX, clientY)?.closest('[data-theme-set]');
+						if (option && group.contains(option)) choose(option.dataset.themeSet);
+					};
+					const stop = () => {
+						removeEventListener('pointermove', follow);
+						removeEventListener('pointerup', stop);
+						removeEventListener('pointercancel', stop);
+					};
+					addEventListener('pointermove', follow);
+					addEventListener('pointerup', stop);
+					addEventListener('pointercancel', stop);
 				});
 
 				// Keep other open tabs in step.

@@ -1,5 +1,5 @@
 import { error, isHttpError, type RequestEvent } from '@sveltejs/kit';
-import { WAIT_FLAG, type Late, type Settled } from '#lib/stable/late.js';
+import { type Late, type Settled, WAIT_FLAG } from '#lib/stable/late.js';
 import { recordFault, recordRefusal, whichRequest } from './faults.js';
 import { record } from './log.js';
 

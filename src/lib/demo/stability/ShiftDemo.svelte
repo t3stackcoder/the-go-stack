@@ -97,7 +97,7 @@
 		type="button"
 		onclick={deliver}
 		disabled={running}
-		class="w-52 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-60"
+		class="w-52 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-ink disabled:opacity-60"
 	>
 		{running ? 'Arriving…' : 'Deliver the late content'}
 	</button>

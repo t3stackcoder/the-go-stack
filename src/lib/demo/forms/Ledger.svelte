@@ -4,7 +4,7 @@
 	one already saved is not acted on, and is not here (see src/lib/forms/server/once.ts).
 -->
 <script lang="ts">
-	import { MAX_LEDGER, type Entry, type Tally } from './boat.js';
+	import { type Entry, MAX_LEDGER, type Tally } from './boat.js';
 
 	let { ledger, tally }: { ledger: Entry[]; tally: Tally } = $props();
 
@@ -66,7 +66,7 @@
 							class={[
 								'w-20 shrink-0 rounded-md px-1.5 font-medium',
 								entry.via === 'enhanced'
-									? 'bg-accent-soft text-accent-text'
+									? 'bg-brand-soft text-brand-text'
 									: 'bg-sunken text-ink ring-1 ring-line ring-inset'
 							]}
 						>

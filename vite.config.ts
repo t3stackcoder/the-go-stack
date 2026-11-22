@@ -1,11 +1,12 @@
+/// <reference types="vitest/config" />
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, normalizePath, type Plugin } from 'vite';
 import adapter from '@sveltejs/adapter-node';
 import { enhancedImages } from '@sveltejs/enhanced-img';
 import { sveltekit } from '@sveltejs/kit/vite';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig, normalizePath, type Plugin } from 'vite';
 import { highlight } from './plugins/highlight.js';
 
 /**
@@ -92,6 +93,8 @@ function payloadKeepsItsFile(): Plugin {
 }
 
 export default defineConfig({
+	// Tests sit beside the code they test, and run in Node unless a file asks for otherwise.
+	test: { include: ['src/**/*.test.ts'] },
 	// How the browser's JavaScript is cut into files. Left alone, the bundler gives every distinct
 	// set of pages that share some code a file of its own, and a page of this site asked for 21 to
 	// 28 of them, some 22 bytes long. A page is not interactive until the last has arrived.

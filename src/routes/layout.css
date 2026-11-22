@@ -1,4 +1,18 @@
 @import 'tailwindcss';
+/* The enter and exit animations the shadcn-svelte components name: `animate-in`, `fade-in-0` and so on. */
+@import 'tw-animate-css';
+
+/*
+ * Tailwind writes CSS for every class in every file it reads, used or not, and every
+ * shadcn-svelte component is installed. Read in full, they took the stylesheet from 42 KB to
+ * 222 KB, past the size at which it is written into the page (see vite.config.ts), and every page
+ * paid for a second round trip before first paint. So only the components in use are read.
+ * src/components.test.ts fails when a component is used and not listed here.
+ *
+ * The `/*` matters: with the folder itself excluded, Tailwind ignores the folders listed under it.
+ */
+@source not '../lib/components/ui/*';
+@source '../lib/components/ui/card';
 
 /*
  * `dark:` must agree with the tokens below in all three states: an explicit dark choice, an
@@ -108,7 +122,8 @@
 
 	/*
 	 * Colour. The default palette is removed so that every colour in the app is a semantic token
-	 * with a light and a dark value. A hard-coded `bg-white` cannot be written by accident.
+	 * with a light and a dark value. A hard-coded `bg-gray-100` cannot be written by accident; black
+	 * and white, below, are the only fixed colours, for the components that need them.
 	 * Each pairing used for text is checked against WCAG AA (4.5:1); `ink` clears AAA (7:1).
 	 */
 	--color-*: initial;
@@ -124,15 +139,49 @@
 	--color-ink-muted: light-dark(oklch(0.45 0.02 265), oklch(0.74 0.015 265));
 	--color-ink-subtle: light-dark(oklch(0.53 0.018 265), oklch(0.64 0.018 265));
 
-	/* `accent` is a fill; `accent-ink` is text on that fill; `accent-text` is accent-coloured text. */
-	--color-accent: light-dark(oklch(0.66 0.2 42), oklch(0.72 0.19 45));
-	--color-accent-ink: oklch(0.18 0.03 45);
-	--color-accent-text: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
-	--color-accent-soft: light-dark(oklch(0.955 0.03 50), oklch(0.28 0.05 45));
+	/* `brand` is a fill; `brand-ink` is text on that fill; `brand-text` is brand-coloured text. */
+	--color-brand: light-dark(oklch(0.66 0.2 42), oklch(0.72 0.19 45));
+	--color-brand-ink: oklch(0.18 0.03 45);
+	--color-brand-text: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
+	--color-brand-soft: light-dark(oklch(0.955 0.03 50), oklch(0.3 0.03 45));
 
 	--color-good: light-dark(oklch(0.5 0.14 155), oklch(0.8 0.16 155));
 	--color-warn: light-dark(oklch(0.52 0.13 80), oklch(0.84 0.14 85));
 	--color-bad: light-dark(oklch(0.52 0.2 27), oklch(0.75 0.16 25));
+
+	/*
+	 * The names the shadcn-svelte components (src/lib/components/ui) are written against, given
+	 * this palette's values. So the components follow the theme switch like everything else, and
+	 * restyling them is done here, not in their files, which the CLI may overwrite.
+	 * `accent` is shadcn's: the quiet highlight of a hovered menu item, not the brand colour.
+	 */
+	--color-background: var(--color-canvas);
+	--color-foreground: var(--color-ink);
+	--color-card: var(--color-surface);
+	--color-card-foreground: var(--color-ink);
+	--color-popover: var(--color-surface);
+	--color-popover-foreground: var(--color-ink);
+	--color-primary: var(--color-brand);
+	--color-primary-foreground: var(--color-brand-ink);
+	--color-secondary: var(--color-sunken);
+	--color-secondary-foreground: var(--color-ink);
+	--color-muted: var(--color-sunken);
+	--color-muted-foreground: var(--color-ink-muted);
+	--color-accent: var(--color-sunken);
+	--color-accent-foreground: var(--color-ink);
+	--color-destructive: var(--color-bad);
+	--color-border: var(--color-line);
+	--color-input: var(--color-line-strong);
+	--color-ring: var(--color-brand);
+	--color-sidebar: var(--color-surface);
+	--color-sidebar-foreground: var(--color-ink);
+	--color-sidebar-accent: var(--color-sunken);
+	--color-sidebar-accent-foreground: var(--color-ink);
+	--color-sidebar-border: var(--color-line);
+	--color-sidebar-ring: var(--color-brand);
+	/* Overlays behind dialogs and sheets are black at partial opacity, in either theme. */
+	--color-black: oklch(0 0 0);
+	--color-white: oklch(1 0 0);
 }
 
 @layer base {
@@ -168,8 +217,15 @@
 		min-height: 100dvh;
 	}
 
+	/* A border written without a colour is the hairline, as the components expect. */
+	*,
+	::before,
+	::after {
+		border-color: var(--color-border);
+	}
+
 	:focus-visible {
-		outline: 2px solid var(--color-accent);
+		outline: 2px solid var(--color-brand);
 		outline-offset: 2px;
 	}
 
@@ -177,10 +233,12 @@
 		*,
 		::before,
 		::after {
+			/* biome-ignore-start lint/complexity/noImportantStyles: a visitor's request for less motion overrides every animation, whatever its specificity */
 			animation-duration: 0.01ms !important;
 			animation-iteration-count: 1 !important;
 			transition-duration: 0.01ms !important;
 			scroll-behavior: auto !important;
+			/* biome-ignore-end lint/complexity/noImportantStyles: the visitor's request for less motion */
 		}
 	}
 }
@@ -254,7 +312,7 @@
 	}
 
 	.prose a {
-		color: var(--color-accent-text);
+		color: var(--color-brand-text);
 		text-decoration: underline;
 		text-underline-offset: 3px;
 	}

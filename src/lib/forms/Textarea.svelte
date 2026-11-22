@@ -1,5 +1,6 @@
 <!--
-	The one way to put a <textarea> on a page. A lint rule forbids a bare one anywhere else.
+	The one way to put a <textarea> on a page. A test (src/markup.test.ts) forbids a bare one
+	anywhere else.
 
 	A field takes what the server sends as its default (`defaultValue`), not as its value, so that
 	hydration leaves alone whatever the visitor typed while the page was still loading (see
@@ -15,7 +16,7 @@
 	hydration leave the element alone, so nothing is redrawn.
 
 	This works around a fault in Svelte and does not fix it. When Svelte renders a textarea's
-	default itself, the `value` line can go, and the component and its lint rule with it.
+	default itself, the `value` line can go, and the component and its rule with it.
 -->
 <script lang="ts">
 	import type { HTMLTextareaAttributes } from 'svelte/elements';
@@ -23,11 +24,19 @@
 
 	let {
 		defaultValue = '',
+		ref = $bindable(null),
 		...rest
 	}: Omit<HTMLTextareaAttributes, 'value' | 'defaultValue' | 'bind:value'> & {
 		/** Where the field starts: what the server holds, or what was typed and refused. */
 		defaultValue?: string;
+		/** The element, for code that has to focus or measure it. */
+		ref?: HTMLTextAreaElement | null;
 	} = $props();
 </script>
 
-<textarea {...rest} value={browser ? undefined : defaultValue} {defaultValue}></textarea>
+<textarea
+	bind:this={ref}
+	{...rest}
+	value={browser ? undefined : defaultValue}
+	{defaultValue}
+></textarea>

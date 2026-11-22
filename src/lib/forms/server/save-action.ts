@@ -31,11 +31,11 @@
  * This directory is named `server`, so SvelteKit refuses to bundle it into browser code.
  */
 import {
+	type ActionFailure,
 	error,
 	fail,
 	isHttpError,
 	isRedirect,
-	type ActionFailure,
 	type RequestEvent
 } from '@sveltejs/kit';
 import type * as z from 'zod';
@@ -68,7 +68,8 @@ export type Echo<Schema extends FormSchema> = {
  * value sent under `price`.
  */
 type FieldKey<Schema extends FormSchema> =
-	(keyof z.input<Schema> & string) | `${keyof z.input<Schema> & string}.${number}`;
+	| (keyof z.input<Schema> & string)
+	| `${keyof z.input<Schema> & string}.${number}`;
 
 /** What an action sends back when it does not save: the data of a `fail()`. */
 export interface Refusal<Name extends string = string, Schema extends FormSchema = FormSchema> {

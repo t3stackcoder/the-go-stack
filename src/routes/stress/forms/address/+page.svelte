@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import { addressForm } from '#lib/forms/address-form.js';
+	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -45,7 +45,9 @@
 		class="mt-6 grid max-w-3xl gap-x-6 gap-y-4 text-sm sm:grid-cols-2"
 	>
 		<!-- Carried along, so a slow page stays slow after the form is sent. -->
-		{#if data.slow}<input type="hidden" name="slow" value={data.slow} />{/if}
+		{#if data.slow}
+			<input type="hidden" name="slow" value={data.slow} />
+		{/if}
 
 		<label>
 			Text
@@ -107,7 +109,9 @@
 		</label>
 
 		<noscript>
-			<button class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink">Send</button>
+			<button type="submit" class="h-10 rounded-lg bg-brand px-4 font-semibold text-brand-ink">
+				Send
+			</button>
 		</noscript>
 	</form>
 
@@ -115,13 +119,14 @@
 	<!-- One line, clipped: the text changes with every edit, and the space it takes must not. -->
 	<pre
 		data-address
-		class="mt-2 h-10 truncate rounded-lg border border-line p-2 text-sm">{JSON.stringify({
-			q: data.q,
-			tags: data.tags,
-			sort: data.sort,
-			per: data.per,
-			only: data.only
-		})}</pre>
+		class="mt-2 h-10 truncate rounded-lg border border-line p-2 text-sm"
+	>{JSON.stringify({
+		q: data.q,
+		tags: data.tags,
+		sort: data.sort,
+		per: data.per,
+		only: data.only
+	})}</pre>
 
 	<p class="mt-4 flex gap-4 text-sm">
 		<a
@@ -129,14 +134,14 @@
 			href="{here}?q=linked&tag=b&tag=c&sort=best&per=50&only=on{data.slow
 				? `&slow=${data.slow}`
 				: ''}"
-			class="text-accent-text underline underline-offset-2"
+			class="text-brand-text underline underline-offset-2"
 		>
 			A link to another state
 		</a>
 		<a
 			data-start
 			href="{here}{data.slow ? `?slow=${data.slow}` : ''}"
-			class="text-accent-text underline underline-offset-2"
+			class="text-brand-text underline underline-offset-2"
 		>
 			Start again
 		</a>

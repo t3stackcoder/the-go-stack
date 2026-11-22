@@ -3,9 +3,9 @@
 	import DemoFrame from '#lib/demo/data/DemoFrame.svelte';
 	import Panel from '#lib/demo/data/Panel.svelte';
 	import panelSource from '#lib/demo/data/Panel.svelte?highlight';
-	import type { PageProps } from './$types';
-	import pageSource from './+page.svelte?highlight';
 	import serverSource from './+page.server.ts?highlight';
+	import pageSource from './+page.svelte?highlight';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>

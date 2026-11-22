@@ -1,11 +1,11 @@
 import { error } from '@sveltejs/kit';
 import * as z from 'zod';
 import {
+	type Entry,
 	moodOf,
+	type Outcome,
 	parseParty,
 	refuseWithout,
-	type Entry,
-	type Outcome,
 	type Via
 } from '#lib/demo/forms/boat.js';
 import { boats } from '#lib/demo/forms/server/store.js';
@@ -47,7 +47,14 @@ const untilLeft = (signal: AbortSignal, ms: number) =>
 	new Promise<void>((resolve) => {
 		if (signal.aborted) return resolve();
 		const timer = setTimeout(resolve, ms);
-		signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true });
+		signal.addEventListener(
+			'abort',
+			() => {
+				clearTimeout(timer);
+				resolve();
+			},
+			{ once: true }
+		);
 	});
 
 export const load: PageServerLoad = async (event) => {

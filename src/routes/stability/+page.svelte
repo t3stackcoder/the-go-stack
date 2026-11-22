@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import ShiftDemo from '#lib/demo/stability/ShiftDemo.svelte';
 	import Chapter from '#lib/ui/Chapter.svelte';
 	import Code from '#lib/ui/Code.svelte';
 	import Demo from '#lib/ui/Demo.svelte';
+	import { resolve } from '$app/paths';
 	import reservedSource from '../../lib/demo/stability/Reserved.svelte?highlight';
 	import unreservedSource from '../../lib/demo/stability/Unreserved.svelte?highlight';
 	import hydrationSource from '../../lib/stable/hydration.svelte.ts?highlight';
-	import reservationSource from '../../lib/stable/reservation.ts?highlight';
 	import reserveSource from '../../lib/stable/Reserve.svelte?highlight';
+	import reservationSource from '../../lib/stable/reservation.ts?highlight';
 	import streamedSource from '../../lib/stable/Streamed.svelte?highlight';
 
 	// Deliberately not a page. `resolve` only accepts addresses that exist, so this one is built by
@@ -68,10 +68,10 @@
 		<p>Two things that usually flicker are handled before any of that:</p>
 		<ul>
 			<li>
-				<strong>The theme.</strong> A stored choice is applied by a few lines of inline script in the
-				document head, before first paint. Which option looks selected is derived in CSS from one attribute,
-				not rendered from component state, so the control is correct in the HTML and works on pages that
-				ship no JavaScript.
+				<strong>The theme.</strong> A stored choice is applied by a few lines of inline script in
+				the document head, before first paint. Which option looks selected is derived in CSS from
+				one attribute, not rendered from component state, so the control is correct in the HTML and
+				works on pages that ship no JavaScript.
 			</li>
 			<li>
 				<strong>The font.</strong> Inter is declared
@@ -104,10 +104,8 @@
 			An image is late content too, and the most common kind. Every image on this site goes through
 			one component, which sizes the image's box from its dimensions before any of the file has
 			arrived. For a file in the repository the build reads the dimensions itself. For an image
-			known only by its address, the component will not compile without them. A lint rule rejects an <code>
-				&lt;img&gt;
-			</code>
-			written anywhere else.
+			known only by its address, the component will not compile without them. A test fails on an
+			<code>&lt;img&gt;</code> written anywhere else.
 			<a href={resolve('/stability/images')}>See the images hold their place</a>.
 		</p>
 	</section>
@@ -149,34 +147,37 @@
 		<h2>What this does not do</h2>
 		<ul>
 			<li>
-				<strong>The font choice has a price.</strong> A first visit may be read in the fallback font until
-				the next page load. Chromium holds its first frame back a moment for the font, and the page only
-				asks it to when the server is close enough for the font to arrive in that moment, so there it
-				takes a slow or distant connection. Firefox does not wait, so there it is most first visits. That
-				is the trade: a plainer typeface for one visit, in exchange for text that never jumps.
+				<strong>The font choice has a price.</strong> A first visit may be read in the fallback font
+				until the next page load. Chromium holds its first frame back a moment for the font, and the
+				page only asks it to when the server is close enough for the font to arrive in that moment,
+				so there it takes a slow or distant connection. Firefox does not wait, so there it is most
+				first visits. That is the trade: a plainer typeface for one visit, in exchange for text that
+				never jumps.
 			</li>
 			<li>
-				<strong>Layout shift is measured in Chromium only.</strong> No other browser reports it to a page,
-				so elsewhere the readout leaves that cell out rather than show a zero it cannot stand behind.
+				<strong>Layout shift is measured in Chromium only.</strong> No other browser reports it to a
+				page, so elsewhere the readout leaves that cell out rather than show a zero it cannot stand
+				behind.
 			</li>
 			<li>
-				<strong>Your own clicks are exempt, in the readout.</strong> By the metric's definition, movement
-				within half a second of your input does not count. The demo above waits a little longer than that
-				on purpose.
+				<strong>Your own clicks are exempt, in the readout.</strong> By the metric's definition,
+				movement within half a second of your input does not count. The demo above waits a little
+				longer than that on purpose.
 			</li>
 			<li>
-				<strong>It cannot stop a mistake being written.</strong> It can only catch one. A box given a
-				minimum height instead of a fixed one will still grow. The development warning is there for that.
+				<strong>It cannot stop a mistake being written.</strong> It can only catch one. A box given
+				a minimum height instead of a fixed one will still grow. The development warning is there
+				for that.
 			</li>
 			<li>
-				<strong>Development is not the reference.</strong> Run this site with its development server and
-				the readout can show a tiny shift now and then, for the reason just described.
+				<strong>Development is not the reference.</strong> Run this site with its development server
+				and the readout can show a tiny shift now and then, for the reason just described.
 			</li>
 			<li>
-				<strong>Embeds and video are untested here.</strong> This site has none. The rule for them is
-				the one for images, a box sized before the content arrives, but nothing on this site proves it.
-				Nor does the image component reach an image set as a CSS background, or one inside HTML that arrives
-				as a string.
+				<strong>Embeds and video are untested here.</strong> This site has none. The rule for them
+				is the one for images, a box sized before the content arrives, but nothing on this site
+				proves it. Nor does the image component reach an image set as a CSS background, or one
+				inside HTML that arrives as a string.
 			</li>
 		</ul>
 	</section>

@@ -7,5 +7,5 @@
 </script>
 
 {#await arrival then message}
-	<p class="h-20 rounded-lg bg-accent-soft p-3 text-sm">{message}</p>
+	<p class="h-20 rounded-lg bg-brand-soft p-3 text-sm">{message}</p>
 {/await}

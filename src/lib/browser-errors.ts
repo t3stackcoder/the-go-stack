@@ -3,10 +3,11 @@
  * read by nobody. They are caught in three places: a navigation that failed (src/hooks.client.ts),
  * an exception nothing caught, and a rejected promise nothing handled.
  */
-import { resolve } from '$app/paths';
-import { page } from '$app/state';
+
 import { describeError, errorReference } from '#lib/errors.js';
 import { hydration } from '#lib/stable/hydration.svelte.js';
+import { resolve } from '$app/paths';
+import { page } from '$app/state';
 
 interface Origin {
 	/**

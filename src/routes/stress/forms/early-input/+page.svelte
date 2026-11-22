@@ -44,6 +44,7 @@
 			<input name="count" type="number" defaultValue={start.count} class={[field, 'h-10']} />
 		</label>
 
+		<!-- biome-ignore lint/a11y/noLabelWithoutControl: Textarea renders the <textarea> this label wraps -->
 		<label class="sm:col-span-2">
 			Text area
 			<Textarea name="notes" rows={2} defaultValue={start.notes} class={[field, 'py-2']} />
@@ -106,9 +107,10 @@
 
 		<div class="flex items-center gap-4 sm:col-span-2">
 			<button
+				type="submit"
 				data-busy={save.busy}
 				aria-disabled={save.busy}
-				class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink aria-disabled:cursor-progress"
+				class="h-10 rounded-lg bg-brand px-4 font-semibold text-brand-ink aria-disabled:cursor-progress"
 			>
 				Save
 			</button>
@@ -135,10 +137,10 @@
 
 	<h2 class="mt-8 text-sm font-medium">What the server was sent</h2>
 	<!-- One line, clipped: the text changes with every save, and the space it takes must not. -->
-	<pre data-sent class="mt-2 h-10 truncate rounded-lg border border-line p-2 text-sm">{save.answer
-			?.saved
-			? JSON.stringify(save.answer.saved)
-			: ''}</pre>
+	<pre
+		data-sent
+		class="mt-2 h-10 truncate rounded-lg border border-line p-2 text-sm"
+	>{save.answer?.saved ? JSON.stringify(save.answer.saved) : ''}</pre>
 
 	<p class="mt-6 text-sm text-ink-muted">This sentence must not move.</p>
 </div>

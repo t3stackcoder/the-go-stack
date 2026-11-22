@@ -1,18 +1,17 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
-	import { onNavigate, snapshot } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { settleEarlyRejections } from '#lib/browser-errors.js';
 	import { keepTyped, putBackTyped } from '#lib/forms/typed.js';
 	import Hud from '#lib/hud/Hud.svelte';
 	import { startMetrics } from '#lib/hud/metrics.svelte.js';
-	import { chapters } from '#lib/site/chapters.js';
 	import { markHydrated } from '#lib/stable/hydration.svelte.js';
 	import { WAIT_FLAG } from '#lib/stable/late.js';
 	import { restoreScrollOnReload } from '#lib/stable/scroll.js';
 	import ThemeSwitch from '#lib/theme/ThemeSwitch.svelte';
+	import { onNavigate, snapshot } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -67,9 +66,6 @@
 		});
 	});
 
-	const isCurrent = (path: string) =>
-		page.url.pathname === path || page.url.pathname.startsWith(`${path}/`);
-
 	// This page at the address that asks the server to wait for its slow data: its own, with the
 	// flag added to whatever query it has.
 	const whole = () =>
@@ -100,7 +96,7 @@
 -->
 <a
 	href="#content"
-	class="sr-only rounded-lg bg-accent px-4 py-2 font-semibold text-accent-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-30"
+	class="sr-only rounded-lg bg-brand px-4 py-2 font-semibold text-brand-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-30"
 >
 	Skip to content
 </a>
@@ -109,45 +105,40 @@
 	<header class="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
 		<div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-6 px-6">
 			<a
-				href={resolve('/')}
-				class="shrink-0 font-display text-[0.9375rem] font-semibold tracking-tight"
+				href={resolve('/team-collaborator')}
+				class="flex shrink-0 items-center gap-2.5 font-display text-[0.9375rem] font-semibold tracking-tight"
 			>
-				The case for SvelteKit
+				<!-- The same mark as static/favicon.svg: two people, side by side. -->
+				<span class="grid size-7 place-items-center rounded-lg bg-brand text-brand-ink">
+					<svg
+						aria-hidden="true"
+						viewBox="0 0 24 24"
+						width="16"
+						height="16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.25"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<circle cx="9" cy="8" r="4" />
+						<path d="M2 21a7 7 0 0 1 14 0" />
+						<path d="M16 4.13a4 4 0 0 1 0 7.75M22 21a7 7 0 0 0-4.5-6.53" />
+					</svg>
+				</span>
+				Team Collaborator
 			</a>
 			<ThemeSwitch />
 		</div>
-
-		<!-- A plain scrolling strip rather than a menu: it needs no state, so it needs no script. -->
-		<nav aria-label="Chapters" class="mx-auto max-w-6xl overflow-x-auto px-6">
-			<ol class="flex h-10 items-center gap-5 text-sm whitespace-nowrap">
-				{#each chapters as chapter (chapter.path)}
-					<li>
-						<a
-							href={resolve(chapter.path)}
-							aria-current={isCurrent(chapter.path) ? 'page' : undefined}
-							class="flex items-baseline gap-1.5 text-ink-muted hover:text-ink aria-[current]:text-ink"
-						>
-							<span class="font-mono text-xs text-ink-subtle">{chapter.number}</span>
-							{chapter.title}
-						</a>
-					</li>
-				{/each}
-			</ol>
-		</nav>
 	</header>
 
-	<!-- Focusable from script only, so that following the skip link moves focus here as well as the view. -->
-	<main id="content" tabindex="-1" class="flex-1 scroll-mt-24 outline-none">
+	<!--
+		Focusable from script only, so that following the skip link moves focus here as well as the
+		view. The bottom padding keeps the last line clear of the pinned readout, taller on a phone.
+	-->
+	<main id="content" tabindex="-1" class="flex-1 scroll-mt-14 pb-32 outline-none sm:pb-24">
 		{@render children()}
 	</main>
-
-	<!-- The bottom padding keeps the last line clear of the pinned readout, which is taller on a phone. -->
-	<footer class="border-t border-line pb-32 sm:pb-24">
-		<p class="mx-auto max-w-6xl px-6 pt-8 text-sm text-ink-subtle">
-			Built with SvelteKit, Svelte, Tailwind CSS and Inter. Every number on this site is measured in
-			your browser, and every code sample is imported from the file that runs.
-		</p>
-	</footer>
 </div>
 
 <Hud />

@@ -47,10 +47,6 @@
 	.heatmap > div {
 		aspect-ratio: 1;
 		border-radius: 2px;
-		background: color-mix(
-			in oklab,
-			var(--color-accent) calc(var(--heat) * 100%),
-			var(--color-line)
-		);
+		background: color-mix(in oklab, var(--color-brand) calc(var(--heat) * 100%), var(--color-line));
 	}
 </style>

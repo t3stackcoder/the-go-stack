@@ -47,7 +47,9 @@
 					<li class="col-span-3 grid h-7 grid-cols-subgrid items-center text-sm">
 						<span class="truncate text-ink-muted">
 							{name}
-							{#if arrival?.failed}<span class="ml-0.5 text-bad">failed</span>{/if}
+							{#if arrival?.failed}
+								<span class="ml-0.5 text-bad">failed</span>
+							{/if}
 						</span>
 						<span class="relative h-full" aria-hidden="true">
 							<span class="absolute inset-x-0 top-1/2 h-px bg-line"></span>
@@ -62,7 +64,7 @@
 									in:grow
 									class={[
 										'absolute top-1/2 left-0 h-2 origin-left -translate-y-1/2 rounded-r-[4px]',
-										arrival.failed ? 'bg-bad' : 'bg-accent'
+										arrival.failed ? 'bg-bad' : 'bg-brand'
 									]}
 									style:width={percent(arrival.at)}
 								></span>

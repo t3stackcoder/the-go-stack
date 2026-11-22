@@ -2,9 +2,9 @@
 	import DemoFrame from '#lib/demo/data/DemoFrame.svelte';
 	import { addressForm } from '#lib/forms/address-form.js';
 	import formSource from '#lib/forms/address-form.ts?highlight';
-	import type { PageProps } from './$types';
-	import pageSource from './+page.svelte?highlight';
 	import serverSource from './+page.server.ts?highlight';
+	import pageSource from './+page.svelte?highlight';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
@@ -51,7 +51,10 @@
 				oninput={(event) => event.currentTarget.form?.requestSubmit()}
 				class="min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 py-2"
 			/>
-			<button class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink">
+			<button
+				type="submit"
+				class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-ink"
+			>
 				Search
 			</button>
 		</div>
@@ -75,7 +78,7 @@
 				<li
 					class="grid h-10 grid-cols-[3rem_minmax(0,1fr)] items-center gap-3 border-b border-line px-3 text-sm sm:grid-cols-[3rem_minmax(0,1fr)_6rem]"
 				>
-					<span class="font-mono font-semibold text-accent-text">{status.code}</span>
+					<span class="font-mono font-semibold text-brand-text">{status.code}</span>
 					<span class="truncate">{status.phrase}</span>
 					<span class="hidden text-xs text-ink-subtle sm:block">{status.kind}</span>
 				</li>

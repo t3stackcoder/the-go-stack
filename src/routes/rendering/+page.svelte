@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import Chapter from '#lib/ui/Chapter.svelte';
 	import Code from '#lib/ui/Code.svelte';
+	import { resolve } from '$app/paths';
 	import prerenderSource from './+page.ts?highlight';
 	import clientSource from './client/+page.ts?highlight';
 	import hybridSource from './hybrid/+page.server.ts?highlight';
@@ -57,11 +57,11 @@
 					data-sveltekit-reload={mode.path === '/rendering/server' ? true : undefined}
 					class="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 hover:border-line-strong"
 				>
-					<p class="font-mono text-xs text-accent-text">{mode.setting}</p>
+					<p class="font-mono text-xs text-brand-text">{mode.setting}</p>
 					<h3 class="mt-3 font-display text-2xl font-semibold tracking-tight">{mode.name}</h3>
 					<p class="mt-3 text-ink-muted">{mode.sends}</p>
 					<p class="mt-2 text-sm text-ink-subtle">{mode.suits}</p>
-					<p class="mt-auto pt-6 text-sm font-medium group-hover:text-accent-text">
+					<p class="mt-auto pt-6 text-sm font-medium group-hover:text-brand-text">
 						Open it <span aria-hidden="true">→</span>
 					</p>
 				</a>

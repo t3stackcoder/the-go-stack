@@ -48,9 +48,10 @@
 	>
 		<div class="flex items-center gap-4">
 			<button
+				type="submit"
 				data-busy={save.busy}
 				aria-disabled={save.busy}
-				class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink aria-disabled:cursor-progress"
+				class="h-10 rounded-lg bg-brand px-4 font-semibold text-brand-ink aria-disabled:cursor-progress"
 			>
 				Save
 			</button>

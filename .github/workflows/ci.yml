@@ -1,6 +1,6 @@
 name: CI
 
-# Every change is held to the same checks a developer runs by hand: types and lint.
+# Every change is held to the same checks a developer runs by hand: types, lint and tests.
 on:
   push:
     branches: [main]
@@ -36,3 +36,6 @@ jobs:
 
       - name: Formatting and lint
         run: pnpm lint
+
+      - name: Tests
+        run: pnpm test

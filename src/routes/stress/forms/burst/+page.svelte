@@ -45,9 +45,10 @@
 				/>
 			</label>
 			<button
+				type="submit"
 				data-busy={save.busy}
 				aria-disabled={save.busy}
-				class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink aria-disabled:cursor-progress"
+				class="h-10 rounded-lg bg-brand px-4 font-semibold text-brand-ink aria-disabled:cursor-progress"
 			>
 				Save
 			</button>
@@ -55,7 +56,9 @@
 
 		<!-- A plain post and a full page load, so the page starts again as well as the server. -->
 		<form method="POST" action="?/reset&again={data.again}">
-			<button class="h-10 rounded-lg border border-line bg-surface px-4 font-medium">Reset</button>
+			<button type="submit" class="h-10 rounded-lg border border-line bg-surface px-4 font-medium">
+				Reset
+			</button>
 		</form>
 	</div>
 

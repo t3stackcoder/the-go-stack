@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { browser } from '$app/env';
 	import Streamed from '#lib/stable/Streamed.svelte';
+	import { browser } from '$app/env';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

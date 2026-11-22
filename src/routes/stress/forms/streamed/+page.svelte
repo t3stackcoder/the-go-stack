@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import { saveForm } from '#lib/forms/save-form.svelte.js';
 	import Streamed from '#lib/stable/Streamed.svelte';
+	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -24,9 +24,10 @@
 		class="mt-6 flex items-center gap-4 text-sm"
 	>
 		<button
+			type="submit"
 			data-busy={add.busy}
 			aria-disabled={add.busy}
-			class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink aria-disabled:cursor-progress"
+			class="h-10 rounded-lg bg-brand px-4 font-semibold text-brand-ink aria-disabled:cursor-progress"
 		>
 			Add one
 		</button>
@@ -54,7 +55,7 @@
 		<a
 			data-elsewhere
 			href="{resolve('/stress/forms/streamed')}{data.elsewhere ? '' : '?elsewhere'}"
-			class="text-accent-text underline underline-offset-2"
+			class="text-brand-text underline underline-offset-2"
 		>
 			The same page at another address
 		</a>

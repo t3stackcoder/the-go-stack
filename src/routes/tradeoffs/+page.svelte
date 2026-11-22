@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import Chapter from '#lib/ui/Chapter.svelte';
+	import { resolve } from '$app/paths';
 
 	const costs = [
 		{
@@ -142,8 +142,8 @@
 			That makes the figures true, and it also makes them narrow.
 		</p>
 		<p>
-			With the costs on the table, the <a href={resolve('/verdict')}>last chapter</a> asks about your
-			situation and gives you an answer.
+			With the costs on the table, the <a href={resolve('/verdict')}>last chapter</a> asks about
+			your situation and gives you an answer.
 		</p>
 	</section>
 </Chapter>

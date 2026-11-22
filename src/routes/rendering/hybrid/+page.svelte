@@ -2,8 +2,8 @@
 	import ModeFrame from '#lib/demo/rendering/ModeFrame.svelte';
 	import ClientOnly from '#lib/stable/ClientOnly.svelte';
 	import Streamed from '#lib/stable/Streamed.svelte';
-	import type { PageProps } from './$types';
 	import source from './+page.server.ts?highlight';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>

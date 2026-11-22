@@ -2,10 +2,10 @@ import { pipeline, Readable } from 'node:stream';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { constants, createBrotliCompress, createGzip } from 'node:zlib';
 import { error } from '@sveltejs/kit';
-import { building, dev } from '$app/env';
-import { STRESS_PAGES } from '$app/env/private';
 import type { Handle, HandleServerError } from '@sveltejs/kit/hooks';
 import { recordFault, recordRefusal } from '#lib/server/faults.js';
+import { building, dev } from '$app/env';
+import { STRESS_PAGES } from '$app/env/private';
 
 const COMPRESSIBLE = /^(text\/|application\/(json|javascript|xml))/;
 

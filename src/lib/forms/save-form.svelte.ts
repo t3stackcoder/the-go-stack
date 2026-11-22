@@ -70,7 +70,7 @@
  */
 import { onDestroy, tick } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
-import { applyAction, enhance, type ActionResult, type SubmitFunction } from '$app/forms';
+import { type ActionResult, applyAction, enhance, type SubmitFunction } from '$app/forms';
 import { afterNavigate } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { reloadData, reloads } from './reload.svelte.js';

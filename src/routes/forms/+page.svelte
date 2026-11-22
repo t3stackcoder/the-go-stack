@@ -7,8 +7,8 @@
 	import Code from '#lib/ui/Code.svelte';
 	import Demo from '#lib/ui/Demo.svelte';
 	import listSource from '../../lib/demo/forms/PassengerList.svelte?highlight';
-	import type { PageProps } from './$types';
 	import actionsSource from './+page.server.ts?highlight';
+	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 </script>
@@ -58,54 +58,57 @@
 			</li>
 			<li>
 				<strong>Add one the server turns down.</strong> Okafor is on the list already, and the boat
-				has {SEATS} seats. The reason appears under the field it is about, in a line that was there all
-				along. What you typed is still in the box, and the keyboard is in the first field that was turned
-				down, unless you had already moved on to another.
+				has {SEATS} seats. The reason appears under the field it is about, in a line that was there
+				all along. What you typed is still in the box, and the keyboard is in the first field that
+				was turned down, unless you had already moved on to another.
 			</li>
 			<li>
-				<strong>Put the skipper ashore, or take them off the list.</strong> Either change is shown at
-				once, because the page assumes the server will agree. The server refuses, and the change is undone
-				in front of you: an optimistic update, rolled back. Tick another row straight after, and the refusal
-				is still there to read.
+				<strong>Put the skipper ashore, or take them off the list.</strong> Either change is shown
+				at once, because the page assumes the server will agree. The server refuses, and the change
+				is undone in front of you: an optimistic update, rolled back. Tick another row straight
+				after, and the refusal is still there to read.
 			</li>
 			<li>
-				<strong>Type a name, and leave.</strong> Follow a link to another chapter and press Back. What
-				you typed is still in the box, as it would be in a browser running no JavaScript at all.
+				<strong>Type a name, and leave.</strong> Follow a link to another chapter and press Back.
+				What you typed is still in the box, as it would be in a browser running no JavaScript at
+				all.
 			</li>
 			<li>
-				<strong>Press <em>Hammer the ticks</em>.</strong> Your browser presses every tick but the skipper’s
-				seven times in about half a second, all the rows at once. Each row sends one request at a time:
-				a press made while one is on its way waits for the answer, and only the newest of the waiting
-				presses is ever sent. Each asks for a state and not a flip. So the server hears from a row two
-				or three times, in the order you pressed, and the last press is the last thing it writes: every
-				row ends the other way up.
+				<strong>Press <em>Hammer the ticks</em>.</strong> Your browser presses every tick but the
+				skipper’s seven times in about half a second, all the rows at once. Each row sends one
+				request at a time: a press made while one is on its way waits for the answer, and only the
+				newest of the waiting presses is ever sent. Each asks for a state and not a flip. So the
+				server hears from a row two or three times, in the order you pressed, and the last press is
+				the last thing it writes: every row ends the other way up.
 			</li>
 		</ul>
 		<p>Then change the server, and send something.</p>
 		<ul>
 			<li>
-				<strong>Is slow.</strong> After half a second the form says so. Type the next name while you wait:
-				the answer leaves it alone when it comes. Press the button again while it is busy: the ledger
-				shows one request, not two.
+				<strong>Is slow.</strong> After half a second the form says so. Type the next name while you
+				wait: the answer leaves it alone when it comes. Press the button again while it is busy: the
+				ledger shows one request, not two.
 			</li>
 			<li>
-				<strong>Never answers.</strong> After eight seconds the form gives up and says so, with what you
-				typed still in it. Set the server back to answering and look at the ledger: the request did arrive,
-				and was abandoned unwritten. A form you gave up on does not save behind your back.
+				<strong>Never answers.</strong> After eight seconds the form gives up and says so, with what
+				you typed still in it. Set the server back to answering and look at the ledger: the request
+				did arrive, and was abandoned unwritten. A form you gave up on does not save behind your
+				back.
 			</li>
 			<li>
-				<strong>Breaks.</strong> The server’s own code throws. The form stays where it is, with a sentence
-				that is safe to show and a reference to quote. The error itself is in the server’s log, under
-				that reference.
+				<strong>Breaks.</strong> The server’s own code throws. The form stays where it is, with a
+				sentence that is safe to show and a reference to quote. The error itself is in the server’s
+				log, under that reference.
 			</li>
 			<li>
-				<strong>Holds back the list.</strong> The server saves, says so, and then never answers when the
-				page asks for the list again. After eight seconds the form stops waiting and tells you what it
-				knows: saved, and the page behind. Whatever you send next is not held up by it.
+				<strong>Holds back the list.</strong> The server saves, says so, and then never answers when
+				the page asks for the list again. After eight seconds the form stops waiting and tells you
+				what it knows: saved, and the page behind. Whatever you send next is not held up by it.
 			</li>
 			<li>
-				<strong>Your own connection.</strong> Turn it off and send anything. The form says there is no
-				connection, keeps what you typed, and sends it when you press again with the connection back.
+				<strong>Your own connection.</strong> Turn it off and send anything. The form says there is
+				no connection, keeps what you typed, and sends it when you press again with the connection
+				back.
 			</li>
 		</ul>
 	</section>
@@ -149,8 +152,8 @@
 			A <code>+page.server.ts</code> file can export <code>actions</code> next to its
 			<code>load</code> function. Each named action answers at its own address on the page,
 			<code>?/add</code>, <code>?/aboard</code> and <code>?/remove</code>, and a form reaches it
-			with an ordinary <code>action</code> attribute. There is no API route to write and no client code
-			to keep in step with one.
+			with an ordinary <code>action</code> attribute. There is no API route to write and no client
+			code to keep in step with one.
 		</p>
 		<p>
 			The three here are written with <code>saveAction</code>, the server’s half of the helper. It
@@ -158,8 +161,8 @@
 			<code>refuse()</code>, by <code>error()</code> or by a fault in its own code, the helper
 			answers with SvelteKit’s <code>fail()</code>, carrying the reason and everything that was
 			submitted. Without JavaScript, SvelteKit renders the page again with that data in its
-			<code>form</code> prop, under the failure’s status. With JavaScript, the same data comes back to
-			the same form. The action does not need to know which kind of request it is answering.
+			<code>form</code> prop, under the failure’s status. With JavaScript, the same data comes back
+			to the same form. The action does not need to know which kind of request it is answering.
 		</p>
 		<p>
 			Two things in this file are there for the demo and would not be in yours: the server’s moods,
@@ -214,100 +217,101 @@
 		<h3>The list, loaded again after an answer</h3>
 		<ul>
 			<li>
-				<strong>One reload that never ended held up every reload after it.</strong> The page’s data is
-				reloaded one request at a time. With the first left unanswered, the next party added was not on
-				the page twelve seconds later, and never would have been. A reload is now given eight seconds
-				and then left behind: the last of the server’s moods, above.
+				<strong>One reload that never ended held up every reload after it.</strong> The page’s data
+				is reloaded one request at a time. With the first left unanswered, the next party added was
+				not on the page twelve seconds later, and never would have been. A reload is now given eight
+				seconds and then left behind: the last of the server’s moods, above.
 			</li>
 			<li>
-				<strong>A reload that failed took the form with it.</strong> With the connection cut between the
-				answer and the reload, the visitor was shown an error page for a save that had worked, and after
-				a refusal lost everything they had typed. The form now stays, and says that it saved and that
-				the page is behind.
+				<strong>A reload that failed took the form with it.</strong> With the connection cut between
+				the answer and the reload, the visitor was shown an error page for a save that had worked,
+				and after a refusal lost everything they had typed. The form now stays, and says that it
+				saved and that the page is behind.
 			</li>
 			<li>
-				<strong>A save the page could not show looked like a save undone.</strong> A tick the server had
-				kept went back to unticked, and nothing said why. And with reloads slower than the ticking, every
-				tick waited for the last.
+				<strong>A save the page could not show looked like a save undone.</strong> A tick the server
+				had kept went back to unticked, and nothing said why. And with reloads slower than the
+				ticking, every tick waited for the last.
 			</li>
 			<li>
-				<strong>After Back, the page could be the browser’s old copy of itself.</strong> Add a party,
-				leave the site, press Back. Two browsers of three showed the list as it had first arrived, without
-				the party the server had. A page come back to now asks for its list again.
+				<strong>After Back, the page could be the browser’s old copy of itself.</strong> Add a
+				party, leave the site, press Back. Two browsers of three showed the list as it had first
+				arrived, without the party the server had. A page come back to now asks for its list again.
 			</li>
 		</ul>
 		<h3>More than one press</h3>
 		<ul>
 			<li>
-				<strong>The page and the server could end up disagreeing.</strong> A second press used to abandon
-				the first on its way, and the server was trusted to notice. Behind a proxy that does not pass
-				a browser’s hanging up on to the server, it cannot: the page said one thing and the server kept
-				the other. A row now sends one request at a time.
+				<strong>The page and the server could end up disagreeing.</strong> A second press used to
+				abandon the first on its way, and the server was trusted to notice. Behind a proxy that does
+				not pass a browser’s hanging up on to the server, it cannot: the page said one thing and the
+				server kept the other. A row now sends one request at a time.
 			</li>
 			<li>
-				<strong>A refusal could go unsaid.</strong> Tick a second row inside the round trip of a refused
-				one, and the refusal was rolled back in silence, because the second row’s save was the last answer
-				and a save has nothing to say.
+				<strong>A refusal could go unsaid.</strong> Tick a second row inside the round trip of a
+				refused one, and the refusal was rolled back in silence, because the second row’s save was
+				the last answer and a save has nothing to say.
 			</li>
 			<li>
-				<strong>One press could run an action seven times.</strong> With the connection dropped after
-				the action had run and before its answer left, two browsers of three sent the post again by themselves,
-				six times more. Every send now carries a key, and the server saves once for a key. So the helper
-				can try again by itself, and “send it again” cannot save twice.
+				<strong>One press could run an action seven times.</strong> With the connection dropped
+				after the action had run and before its answer left, two browsers of three sent the post
+				again by themselves, six times more. Every send now carries a key, and the server saves once
+				for a key. So the helper can try again by itself, and “send it again” cannot save twice.
 			</li>
 			<li>
-				<strong>A double-click on a cross removed two rows.</strong> The row left the page at the first
-				click, the next row moved up under the pointer, and the second click landed on it.
+				<strong>A double-click on a cross removed two rows.</strong> The row left the page at the
+				first click, the next row moved up under the pointer, and the second click landed on it.
 			</li>
 		</ul>
 		<h3>What was typed, and where the keyboard was</h3>
 		<ul>
 			<li>
-				<strong>An answer took the keyboard from a visitor in mid-word.</strong> Start on the second field
-				while the form is on its way, and the answer moved focus back to the first: the rest of the word
-				went into the wrong box.
+				<strong>An answer took the keyboard from a visitor in mid-word.</strong> Start on the second
+				field while the form is on its way, and the answer moved focus back to the first: the rest
+				of the word went into the wrong box.
 			</li>
 			<li>
-				<strong>With JavaScript, leaving the page lost what was typed.</strong> Type half a form, follow
-				a link, press Back. Without JavaScript the browser had kept every word, and with it the form came
-				back empty. It is kept now, either way.
+				<strong>With JavaScript, leaving the page lost what was typed.</strong> Type half a form,
+				follow a link, press Back. Without JavaScript the browser had kept every word, and with it
+				the form came back empty. It is kept now, either way.
 			</li>
 			<li>
-				<strong>A late redirect took the visitor.</strong> Send a form whose action redirects, follow
-				a link while it is on its way, and the answer pulled you back when it came.
+				<strong>A late redirect took the visitor.</strong> Send a form whose action redirects,
+				follow a link while it is on its way, and the answer pulled you back when it came.
 			</li>
 			<li>
-				<strong>Without JavaScript, text over a limit came back cut.</strong> It was turned down, shortened
-				on its way back to the page, and saved in its shortened form by the next press. It now comes back
-				whole.
+				<strong>Without JavaScript, text over a limit came back cut.</strong> It was turned down,
+				shortened on its way back to the page, and saved in its shortened form by the next press. It
+				now comes back whole.
 			</li>
 			<li>
-				<strong>Without JavaScript, a refused tick said nothing you could see.</strong> The page that
-				answered landed on the list with the reason below the foot of the window. The line now sits above
-				the list.
+				<strong>Without JavaScript, a refused tick said nothing you could see.</strong> The page
+				that answered landed on the list with the reason below the foot of the window. The line now
+				sits above the list.
 			</li>
 		</ul>
 		<h3>What was said, and what was recorded</h3>
 		<ul>
 			<li>
-				<strong>“Send it again” for a save that had been made.</strong> When an answer was lost on its
-				way back, the form spoke as if nothing had been saved. It now says that it may have been.
+				<strong>“Send it again” for a save that had been made.</strong> When an answer was lost on
+				its way back, the form spoke as if nothing had been saved. It now says that it may have
+				been.
 			</li>
 			<li>
-				<strong>Visitors on record as faults.</strong> A visitor who gave up half way through sending,
-				one whose connection dropped, and a request that was not a form at all were each recorded as an
-				unexpected error in the site’s code.
+				<strong>Visitors on record as faults.</strong> A visitor who gave up half way through
+				sending, one whose connection dropped, and a request that was not a form at all were each
+				recorded as an unexpected error in the site’s code.
 			</li>
 			<li>
-				<strong>A page that stopped answering after Back.</strong> In the test build of Safari’s engine,
-				once the cross-fade between pages had run, coming Back to this page could leave it dead. It was
-				not the form’s doing, and it was the form’s visitor who found it. Safari’s engine now gets a hard
-				cut between pages.
+				<strong>A page that stopped answering after Back.</strong> In the test build of Safari’s
+				engine, once the cross-fade between pages had run, coming Back to this page could leave it
+				dead. It was not the form’s doing, and it was the form’s visitor who found it. Safari’s
+				engine now gets a hard cut between pages.
 			</li>
 			<li>
-				<strong>An answer in the shape of a result.</strong> An error written as JSON by something in
-				front of the server could be taken for an action’s own answer, and one of them put the error page
-				in place of the form.
+				<strong>An answer in the shape of a result.</strong> An error written as JSON by something
+				in front of the server could be taken for an action’s own answer, and one of them put the
+				error page in place of the form.
 			</li>
 		</ul>
 	</section>
@@ -320,14 +324,16 @@
 		</p>
 		<ul>
 			<li>
-				<strong>You design the version without JavaScript first.</strong> Every control that changes data
-				has to be a real form with a real submit button. The ticks on this list are buttons inside forms,
-				not checkboxes, because a checkbox cannot send anything to the server on its own.
+				<strong>You design the version without JavaScript first.</strong> Every control that changes
+				data has to be a real form with a real submit button. The ticks on this list are buttons
+				inside forms, not checkboxes, because a checkbox cannot send anything to the server on its
+				own.
 			</li>
 			<li>
-				<strong>Some interactions have no HTML equivalent.</strong> Drag-and-drop reordering, search as
-				you type, and anything else that reacts to each keystroke needs JavaScript. So does the hammer
-				on this page. Without it you offer a plainer alternative, or the feature is not there.
+				<strong>Some interactions have no HTML equivalent.</strong> Drag-and-drop reordering, search
+				as you type, and anything else that reacts to each keystroke needs JavaScript. So does the
+				hammer on this page. Without it you offer a plainer alternative, or the feature is not
+				there.
 			</li>
 			<li>
 				<strong>A plain post is a full page load.</strong> It returns to the top of the page unless
@@ -336,24 +342,25 @@
 				of the data the action returned.
 			</li>
 			<li>
-				<strong>A bare <code>use:enhance</code> is a start, not a finish.</strong> Measured on this site
-				before the helper existed: a post that was never answered showed nothing at all, an action that
-				failed replaced the form with an error page, three quick saves could leave the page and the server
-				disagreeing, and every submission dropped the page’s query string from the address. Each has a
-				few lines of answer. Someone has to know to write them, once, in one place, and then someone has
-				to try to break them.
+				<strong>A bare <code>use:enhance</code> is a start, not a finish.</strong> Measured on this
+				site before the helper existed: a post that was never answered showed nothing at all, an
+				action that failed replaced the form with an error page, three quick saves could leave the
+				page and the server disagreeing, and every submission dropped the page’s query string from
+				the address. Each has a few lines of answer. Someone has to know to write them, once, in one
+				place, and then someone has to try to break them.
 			</li>
 			<li>
-				<strong>The memory that stops a press saving twice is one server’s.</strong> A browser sends a
-				post again by itself when its connection fails before any answer has come. The server knows the
-				repeat by its key, but it remembers in its own memory. Run two servers, or restart one at the
-				wrong moment, and a repeat can get past. Where that matters an action has to be safe by itself:
-				the ticks here ask for a state and not a flip, and a name already on the list is turned down.
+				<strong>The memory that stops a press saving twice is one server’s.</strong> A browser sends
+				a post again by itself when its connection fails before any answer has come. The server
+				knows the repeat by its key, but it remembers in its own memory. Run two servers, or restart
+				one at the wrong moment, and a repeat can get past. Where that matters an action has to be
+				safe by itself: the ticks here ask for a state and not a flip, and a name already on the
+				list is turned down.
 			</li>
 			<li>
-				<strong>Every change is a round trip.</strong> The server holds the truth, which is what makes
-				the path without JavaScript possible. An app that has to keep working offline needs a different
-				design.
+				<strong>Every change is a round trip.</strong> The server holds the truth, which is what
+				makes the path without JavaScript possible. An app that has to keep working offline needs a
+				different design.
 			</li>
 		</ul>
 	</section>

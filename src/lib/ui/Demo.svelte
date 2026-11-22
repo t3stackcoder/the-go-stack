@@ -23,14 +23,12 @@
 		class="flex h-11 items-center justify-between gap-4 border-b border-line bg-sunken px-4 text-sm"
 	>
 		<span class="flex items-center gap-2 truncate font-medium">
-			<span class="size-2 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+			<span class="size-2 shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
 			{title}
 		</span>
 		{#if note}
 			<span class="shrink-0 text-ink-subtle">{note}</span>
 		{/if}
 	</figcaption>
-	<div class={['p-5 sm:p-6', className]}>
-		{@render children()}
-	</div>
+	<div class={['p-5 sm:p-6', className]}> {@render children()} </div>
 </figure>

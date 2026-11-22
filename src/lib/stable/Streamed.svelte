@@ -26,7 +26,7 @@
 	up and the response open for as long as the visitor stays.
 -->
 <script lang="ts" generics="T">
-	import { untrack, type Snippet } from 'svelte';
+	import { type Snippet, untrack } from 'svelte';
 	import type { ClassValue } from 'svelte/elements';
 	import { page } from '$app/state';
 	import type { Late } from './late.js';

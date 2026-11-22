@@ -14,9 +14,9 @@
 	in one row. A cell is left out where the browser cannot measure what it reports.
 -->
 <script lang="ts">
-	import { afterNavigate, beforeNavigate } from '$app/navigation';
 	import { hydration } from '#lib/stable/hydration.svelte.js';
 	import Reserve from '#lib/stable/Reserve.svelte';
+	import { afterNavigate, beforeNavigate } from '$app/navigation';
 	import { kilobytes, metrics, responseTime, shiftScore } from './metrics.svelte.js';
 
 	// The most recent client-side navigation: how long it took and how much JavaScript the app

@@ -14,11 +14,11 @@
 	import {
 		MAX_NAME,
 		MAX_PARTY,
-		SEATS,
-		refuseWithout,
-		seatsTaken,
 		type Mood,
 		type Party,
+		refuseWithout,
+		SEATS,
+		seatsTaken,
 		type Tally
 	} from './boat.js';
 
@@ -158,7 +158,7 @@
 	<p class="mt-1 text-sm text-ink-muted tabular-nums">{taken} of {SEATS} seats taken</p>
 	<div class="mt-3 h-1.5 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
 		<div
-			class="h-full origin-left rounded-full bg-accent transition-transform duration-300"
+			class="h-full origin-left rounded-full bg-brand transition-transform duration-300"
 			style:transform="scaleX({taken / SEATS})"
 		></div>
 	</div>
@@ -214,7 +214,7 @@
 		<button
 			type="submit"
 			aria-disabled={add.busy}
-			class="mt-6.5 grid h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink aria-disabled:cursor-progress"
+			class="mt-6.5 grid h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-brand-ink aria-disabled:cursor-progress"
 		>
 			<span class={['self-center [grid-area:1/1]', add.busy && 'invisible']}>Add to the list</span>
 			<span
@@ -285,6 +285,7 @@
 							<input type="hidden" name="id" value={party.id} />
 							<input type="hidden" name="aboard" value={String(!party.aboard)} />
 							<button
+								type="submit"
 								aria-pressed={party.aboard}
 								class="flex h-full w-full items-center gap-3 rounded-lg pl-3.5 text-left"
 							>
@@ -292,14 +293,16 @@
 									class={[
 										'grid size-5 shrink-0 place-items-center rounded-md border',
 										party.aboard
-											? 'border-accent bg-accent text-accent-ink'
+											? 'border-brand bg-brand text-brand-ink'
 											: 'border-line-strong bg-surface',
 										refused === party.id && 'border-bad',
 										boarding.has(party.id) && 'animate-pulse'
 									]}
 									aria-hidden="true"
 								>
-									{#if party.aboard}{@render icon('m3.5 8.5 3 3 6-7')}{/if}
+									{#if party.aboard}
+										{@render icon('m3.5 8.5 3 3 6-7')}
+									{/if}
 								</span>
 								<span class="sr-only">Aboard:</span>
 								<span class="truncate" title={party.name}>{party.name}</span>
@@ -316,6 +319,7 @@
 						<form method="POST" action="?/remove{server}#passengers" {@attach rows.attach}>
 							<input type="hidden" name="id" value={party.id} />
 							<button
+								type="submit"
 								data-remove
 								onclick={once}
 								onkeydown={once}
@@ -357,8 +361,8 @@
 					{run.rows === 1 ? 'row' : 'rows'}. Waiting for the last answers.
 				{:else}
 					{run.presses} presses on {run.rows}
-					{run.rows === 1 ? 'row' : 'rows'}. The server was sent {heard.reached} of them, one at a time
-					for each row, and saved {heard.saved}{heard.abandoned
+					{run.rows === 1 ? 'row' : 'rows'}. The server was sent {heard.reached} of them, one at a
+					time for each row, and saved {heard.saved}{heard.abandoned
 						? `. ${heard.abandoned} were abandoned unwritten`
 						: ''}.
 				{/if}

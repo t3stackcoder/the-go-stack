@@ -1,0 +1,56 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	// Project instructions are hand-formatted.
+	"files": { "includes": ["**", "!static", "!CLAUDE.md"] },
+	"tailwind": { "stylesheet": "./src/routes/layout.css" },
+	"formatter": { "indentStyle": "tab", "lineWidth": 100 },
+	"css": { "formatter": { "quoteStyle": "single" } },
+	"javascript": { "formatter": { "quoteStyle": "single", "trailingCommas": "none" } },
+	// Lints and formats Svelte markup as well as its <script>, so names used only in the markup count as used.
+	"html": {
+		"experimentalFullSupportEnabled": true,
+		"formatter": {
+			"enabled": true,
+			"indentScriptAndStyle": true,
+			"selfCloseVoidElements": "always",
+			// Never adds or removes whitespace that could be rendered: layout here is measured.
+			"whitespaceSensitivity": "strict"
+		}
+	},
+	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	// Code the shadcn-svelte CLI writes is formatted like the rest, but not linted: it is upstream's,
+	// and changing it to suit these rules would only make updates from the CLI harder to read.
+	"overrides": [
+		{
+			"includes": [
+				"src/lib/components/ui/**",
+				"src/lib/hooks/is-mobile.svelte.ts",
+				"src/lib/hooks/use-highlighted-code.svelte.ts",
+				"src/lib/highlighter.ts",
+				"src/lib/utils.ts"
+			],
+			"linter": { "enabled": false }
+		}
+	],
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			// Idioms this codebase uses on purpose: `x!` after a lookup that cannot miss, `T | void`
+			// for an optional return, and `return (cached = value)`.
+			"style": { "noNonNullAssertion": "off" },
+			"suspicious": { "noConfusingVoidType": "off", "noAssignInExpressions": "off" },
+			"a11y": {
+				// It asks for <fieldset> over role="group" and <search> over <form role="search">,
+				// neither of which is the better element here.
+				"useSemanticElements": "off",
+				// The Svelte compiler makes the same check, and its `svelte-ignore` can be placed on
+				// an element; Biome's suppression comment cannot reach an attribute inside a tag.
+				"noNoninteractiveTabindex": "off"
+			},
+			// Classes in the order prettier-plugin-tailwindcss kept them in.
+			"nursery": { "useTailwindSortedClasses": "error" }
+		}
+	}
+}

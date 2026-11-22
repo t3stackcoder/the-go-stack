@@ -9,13 +9,13 @@
  * This directory is named `server`, so SvelteKit refuses to bundle it into browser code.
  */
 import {
+	type Entry,
 	MAX_LEDGER,
 	MAX_NAME,
+	type Party,
 	SEATS,
 	SEED,
 	seatsTaken,
-	type Entry,
-	type Party,
 	type Tally
 } from '../boat.js';
 

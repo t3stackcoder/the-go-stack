@@ -6,7 +6,11 @@
  * list stays on the server, and only the matches for a query are ever sent to the page.
  */
 export type StatusKind =
-	'Informational' | 'Success' | 'Redirection' | 'Client error' | 'Server error';
+	| 'Informational'
+	| 'Success'
+	| 'Redirection'
+	| 'Client error'
+	| 'Server error';
 
 export interface StatusCode {
 	code: number;

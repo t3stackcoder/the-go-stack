@@ -16,6 +16,4 @@
 	let { class: className, children }: { class: ClassValue; children: Snippet } = $props();
 </script>
 
-<div data-reserve class={['reserve', className]} {@attach reservation}>
-	{@render children()}
-</div>
+<div data-reserve class={['reserve', className]} {@attach reservation}> {@render children()} </div>

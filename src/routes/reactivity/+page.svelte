@@ -6,9 +6,9 @@
 	import Chapter from '#lib/ui/Chapter.svelte';
 	import Code from '#lib/ui/Code.svelte';
 	import Demo from '#lib/ui/Demo.svelte';
-	import basketSource from '../../lib/demo/reactivity/basket.svelte.ts?highlight';
 	import summarySource from '../../lib/demo/reactivity/BasketSummary.svelte?highlight';
 	import billSource from '../../lib/demo/reactivity/BillSplit.svelte?highlight';
+	import basketSource from '../../lib/demo/reactivity/basket.svelte.ts?highlight';
 	import heatmapSource from '../../lib/demo/reactivity/Heatmap.svelte?highlight';
 	import measureSource from '../../lib/demo/reactivity/measure.ts?highlight';
 	import shelfSource from '../../lib/demo/reactivity/Shelf.svelte?highlight';
@@ -22,9 +22,9 @@
 		<h2>State is a variable</h2>
 		<p>
 			Svelte 5 marks reactive values with <strong>runes</strong>: <code>$state</code> declares a
-			piece of state, and <code>$derived</code> declares a value computed from other state. They look
-			like function calls, but they are instructions to the compiler. What they give you is used like
-			any other variable: read it, assign to it, increment it.
+			piece of state, and <code>$derived</code> declares a value computed from other state. They
+			look like function calls, but they are instructions to the compiler. What they give you is
+			used like any other variable: read it, assign to it, increment it.
 		</p>
 		<p>
 			The calculator below is the whole component, and its source beside it is the file that is
@@ -101,8 +101,9 @@
 		<h3>Reading the numbers</h3>
 		<p>
 			Nodes written should match cells changed: one style write per cell, whether you change one or
-			a thousand every frame. <strong>Cool all</strong> is the telling case. It assigns zero to all 2,400
-			cells, but a cell that was already cold has not changed, so only the warm ones are written.
+			a thousand every frame. <strong>Cool all</strong> is the telling case. It assigns zero to all
+			2,400 cells, but a cell that was already cold has not changed, so only the warm ones are
+			written.
 		</p>
 		<p>
 			The update time covers your code and Svelte's. The browser still has to restyle and paint what
@@ -161,15 +162,15 @@
 	<section class="prose">
 		<h2>Effects are the exception</h2>
 		<p>
-			<code>$effect</code> runs code after Svelte has updated the DOM, and runs it again when the state
-			it read changes. If it returns a function, that function runs before the next run and when the component
-			is destroyed. Effects never run on the server.
+			<code>$effect</code> runs code after Svelte has updated the DOM, and runs it again when the
+			state it read changes. If it returns a function, that function runs before the next run and
+			when the component is destroyed. Effects never run on the server.
 		</p>
 		<p>
 			It is for the edges of an application: a canvas, a third-party widget, a timer, a
 			subscription. It is not for keeping one value in step with another. That is what
-			<code>$derived</code> is for, and a derived value is correct whenever it is read, where an effect
-			that copies state is correct only once it has run.
+			<code>$derived</code> is for, and a derived value is correct whenever it is read, where an
+			effect that copies state is correct only once it has run.
 		</p>
 		<p>
 			The demos in this chapter use exactly one effect. It starts the grid's animation loop when you
@@ -183,9 +184,10 @@
 			Runes have rules of their own. A <code>$state</code> object is a proxy, and its reactivity
 			lives in property access: <code>const &#123; heat &#125; = cell</code> copies the current
 			number into a plain variable that will never update, and passing <code>cell.heat</code> to a
-			function passes a number, not a live value. And a module cannot export a <code>$state</code> variable
-			that it reassigns, because the compiler only rewrites references in the file that declares it. You
-			export an object or a class instance instead, which is why the basket is a class.
+			function passes a number, not a live value. And a module cannot export a
+			<code>$state</code> variable that it reassigns, because the compiler only rewrites references
+			in the file that declares it. You export an object or a class instance instead, which is why
+			the basket is a class.
 		</p>
 		<p>None of this is hard, but each point is easy to trip over once before it becomes habit.</p>
 	</section>
