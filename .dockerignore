@@ -1,9 +1,0 @@
-# Everything the image build does not need.
-node_modules
-build
-.svelte-kit
-.git
-.github
-.vscode
-.env
-.env.*
