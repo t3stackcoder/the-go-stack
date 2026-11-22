@@ -42,7 +42,6 @@
  * client-side navigation after a slow load. So the script takes the decision out of the browser's
  * hands: at the first frame, if Inter has not loaded, it marks the page (`data-font="fallback"`,
  * styled further down) and Inter leaves the font stack for the rest of the visit.
- * e2e/fonts.e2e.ts holds all three browsers to one font per visit.
  *
  * Chromium's hold has a price: about 100 ms of first paint, paid whether or not the font arrives.
  * So the script only asks when the font can make it: on a later visit, when the file should be in

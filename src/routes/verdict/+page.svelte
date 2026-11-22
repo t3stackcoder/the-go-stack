@@ -194,7 +194,7 @@
 			For a web product built by a team that controls its own interface: yes. It is a short, direct
 			route from an idea to a page that is server-rendered, fast, and fully interactive, and it asks
 			for very little machinery to get there. This site is the evidence. It was built in a single
-			sitting, and every page of it is held to a layout shift of zero by an automated audit.
+			sitting.
 		</p>
 		<p>
 			The price is a smaller ecosystem and a framework that is still changing. If either of those

@@ -1,10 +1,7 @@
-# Everything the image build does not need. The e2e folder stays: a page imports the audit's
-# source to show it.
+# Everything the image build does not need.
 node_modules
 build
 .svelte-kit
-test-results
-playwright-report
 .git
 .github
 .vscode

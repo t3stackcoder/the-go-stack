@@ -4,7 +4,6 @@
 	import Chapter from '#lib/ui/Chapter.svelte';
 	import Code from '#lib/ui/Code.svelte';
 	import Demo from '#lib/ui/Demo.svelte';
-	import auditSource from '../../../e2e/stability.e2e.ts?highlight';
 	import reservedSource from '../../lib/demo/stability/Reserved.svelte?highlight';
 	import unreservedSource from '../../lib/demo/stability/Unreserved.svelte?highlight';
 	import hydrationSource from '../../lib/stable/hydration.svelte.ts?highlight';
@@ -131,87 +130,13 @@
 	</div>
 
 	<section class="prose">
-		<p>
-			Before shipping, an audit visits every page in a real browser. It finds the pages by reading
-			the routes folder, so a new page is covered the moment its file exists. Each page must pass
-			five checks:
-		</p>
-		<ol>
-			<li>Nothing moves after first paint, on a fast machine.</li>
-			<li>
-				Nothing moves on a slow one: a phone-sized screen, the processor slowed fourfold, the font
-				delayed by a second and a half, every image by a second, and the scripts held back to
-				stretch the gap before hydration. Each image is then scrolled into view, so that the ones
-				loaded lazily are judged too.
-			</li>
-			<li>
-				Hydration and late images leave the page as the server painted it. The app's JavaScript and
-				every image are held back while each element's position, size and text is recorded, then
-				released, and everything is recorded again on the same page load. The two must match. Only
-				the contents of reserved boxes may differ.
-			</li>
-			<li>
-				Reached by a link from another page, which is how most pages are reached, nothing moves once
-				the new page's first frame has been drawn. Every movement after that frame counts, including
-				the half second after a click that the standard metric forgives.
-			</li>
-			<li>
-				Reached that way, every element is measured in that first frame and again once the page has
-				settled, late data and images included. The two must match.
-			</li>
-		</ol>
-		<p>
-			Checks one, two and four read the browser's own report of what moved, and only Chromium makes
-			one. Checks three and five are measurements, which any browser can take, so they run in
-			Firefox and WebKit as well.
-		</p>
-	</section>
-
-	<div class="max-w-3xl">
-		<Code html={auditSource} file="e2e/stability.e2e.ts" collapsed="Read the audit" />
-	</div>
-
-	<section class="prose">
-		<h2>It caught its own author, four times</h2>
-		<p>
-			The first time the audit ran against the readout at the bottom of this page, the readout
-			failed. Its cells were sized by their contents, so each time a number updated, its neighbours
-			slid sideways by a fraction of a pixel. It was causing the layout shift it was reporting. It
-			now sits on a fixed grid.
-		</p>
-		<p>
-			The development warning was wrong at first too. A deliberately broken page, written to confirm
-			that each check can actually fail, showed the warning staying silent. It was taking its first
-			measurement a frame late, after the late content had already landed. A check that has never
-			been seen to fail is not yet a check.
-		</p>
-		<p>
-			And once, measuring stopped a fix that was not needed. In development the readout showed a
-			faint shift as the font loaded, so a gate was written to control the moment the font could
-			appear. Then the same test was run against a production build, with the font held back by
-			anything from nothing to 600 milliseconds: no shift in any case, with the gate or without it.
-			The development server had been re-inserting the stylesheet after load and causing the
-			movement itself. The gate was deleted.
-		</p>
-		<p>
-			That was right for the one browser it was measured in. Run in Firefox and WebKit for the first
-			time, the audit's measurements showed what Chromium never does. Firefox laid the text out a
-			second time, about a tenth of a second after first paint, on every first visit. WebKit kept
-			the fallback after a slow start, then swapped Inter in at the next click on a link, under the
-			reader. A smaller rule replaced the gate: the font is decided once, when the first frame is
-			drawn, and stays decided for the visit. A result measured in one browser is a result about one
-			browser.
-		</p>
-	</section>
-
-	<section class="prose">
 		<h2>When a page fails</h2>
 		<p>
 			A failure is still a page, and it is held to the same rules. Follow a link to
 			<a href={missingPage} rel="external">an address with nothing behind it</a>, or to
 			<a href={resolve('/stability/failure')}>a page whose server code throws</a>. Either way the
 			navigation, the theme and the readout stay where they were, the response carries the right
-			status, and nothing shifts. Both are in the audit.
+			status, and nothing shifts.
 		</p>
 		<p>
 			The second page fails on purpose, every time. What it throws is written to the server's log
@@ -232,30 +157,20 @@
 			</li>
 			<li>
 				<strong>Layout shift is measured in Chromium only.</strong> No other browser reports it to a page,
-				so elsewhere the readout leaves that cell out rather than show a zero it cannot stand behind,
-				and three of the audit's five checks run in Chromium alone. A pass in Firefox or WebKit says that
-				everything was where it should be each time it was measured. It cannot say that nothing moved
-				in between.
-			</li>
-			<li>
-				<strong>The WebKit is not a Mac's.</strong> The audit runs the WebKit build that ships with its
-				test tool. It shares Safari's engine but not its fonts or its platform, and nothing here has been
-				checked on an iPhone or a Mac.
+				so elsewhere the readout leaves that cell out rather than show a zero it cannot stand behind.
 			</li>
 			<li>
 				<strong>Your own clicks are exempt, in the readout.</strong> By the metric's definition, movement
 				within half a second of your input does not count. The demo above waits a little longer than that
-				on purpose. The audit does not allow itself the same excuse when it follows a link.
+				on purpose.
 			</li>
 			<li>
 				<strong>It cannot stop a mistake being written.</strong> It can only catch one. A box given a
-				minimum height instead of a fixed one will still grow. The warning and the audit are there for
-				that.
+				minimum height instead of a fixed one will still grow. The development warning is there for that.
 			</li>
 			<li>
 				<strong>Development is not the reference.</strong> Run this site with its development server and
-				the readout can show a tiny shift now and then, for the reason just described. The audit measures
-				the production build, because that is what visitors get.
+				the readout can show a tiny shift now and then, for the reason just described.
 			</li>
 			<li>
 				<strong>Embeds and video are untested here.</strong> This site has none. The rule for them is

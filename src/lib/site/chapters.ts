@@ -36,7 +36,7 @@ export const chapters = [
 		number: '05',
 		title: 'Stability',
 		headline: 'Nothing moves',
-		blurb: 'How this site guarantees zero layout shift, and the audit that proves it.'
+		blurb: 'How this site avoids layout shift.'
 	},
 	{
 		path: '/tradeoffs',
