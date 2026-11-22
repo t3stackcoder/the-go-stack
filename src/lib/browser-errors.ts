@@ -15,17 +15,36 @@ interface Origin {
 	route: string | null;
 }
 
+/**
+ * The most of a message and of a stack that is sent. The endpoint refuses a report of more than
+ * 8 KB whole, and a stack alone can be longer than that. Firefox, which puts no limit on the
+ * frames it lists, sent 9 KB for an error thrown while a component rendered, and that error was
+ * never recorded. A stack starts where the error was thrown, so it is the far end that is cut.
+ */
+const MAX_MESSAGE = 1000;
+const MAX_STACK = 4000;
+
 /** Records an error on the server, and returns the reference it was recorded under. */
 export function reportError(error: unknown, origin: Origin): string {
 	const reference = errorReference();
+	const { name, message, stack } = describeError(error);
 
 	// A beacon is handed to the browser to deliver, so it still arrives if the visitor leaves the
 	// page. It returns false when the browser refuses it, and there is then nowhere left to say so.
 	navigator.sendBeacon(
 		resolve('/api/client-errors'),
-		new Blob([JSON.stringify({ reference, ...origin, ...describeError(error) })], {
-			type: 'application/json'
-		})
+		new Blob(
+			[
+				JSON.stringify({
+					reference,
+					...origin,
+					name,
+					message: message.slice(0, MAX_MESSAGE),
+					stack: stack?.slice(0, MAX_STACK)
+				})
+			],
+			{ type: 'application/json' }
+		)
 	);
 
 	return reference;

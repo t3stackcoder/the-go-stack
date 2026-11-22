@@ -37,17 +37,30 @@ function bootScriptHash() {
  */
 const SOURCE = `${normalizePath(resolve('src'))}/`;
 
+/** Svelte and SvelteKit: the packages every page needs. */
+const FRAMEWORK = /[\\/]node_modules[\\/](svelte|@sveltejs)[\\/]/;
+
+/** The package a file under node_modules belongs to, such as `zod`. */
+const packageOf = (id: string) =>
+	/.*[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/.exec(id)?.[1].replace(/[\\/]/, '-') ?? null;
+
 export default defineConfig({
 	// How the browser's JavaScript is cut into files. Left alone, the bundler gives every distinct
 	// set of pages that share some code a file of its own, and a page of this site asked for 21 to
 	// 28 of them, some 22 bytes long. A page is not interactive until the last has arrived.
 	//
-	// Two rules gather the pieces. Code from packages that more than one entry uses goes into one
-	// file, which changes only when a dependency does. This site's own source that three or more
-	// pages use goes into another. The rest is cut as before: a page's own code is in the page's
-	// file, and code that exactly two pages share, such as a code sample printed on both, keeps a
-	// small file to itself. So do SvelteKit's entry files and the bundler's helpers. A page now
-	// asks for 11 to 15 files.
+	// Three rules gather the pieces. Code from Svelte and SvelteKit that more than one entry uses
+	// goes into one file, which changes only when they do. Any other package that more than one
+	// entry uses gets a file to itself, fetched by the pages that use that package and by no
+	// others. This site's own source that three or more pages use goes into another. The rest is
+	// cut as before: a page's own code is in the page's file, and code that exactly two pages
+	// share, such as a code sample printed on both, keeps a small file to itself. So do SvelteKit's
+	// entry files and the bundler's helpers. A page now asks for 11 to 15 files.
+	//
+	// The second rule was once part of the first, which took in every package. That held while
+	// Svelte and SvelteKit were the only ones. Then four pages under /stress used Superforms, it
+	// went into the file every page fetches, and each page of the site was 8.6 KB heavier on the
+	// wire for a library it never ran. In a file of its own it is 9.5 KB, sent to those four.
 	//
 	// Measured on 2026-11-21, loading the two builds alternately in Chromium. Over HTTP/1.1, where
 	// a browser fetches six files at a time, pages were interactive 50 to 70 ms sooner at a 20 ms
@@ -70,7 +83,8 @@ export default defineConfig({
 					output: {
 						codeSplitting: {
 							groups: [
-								{ name: 'framework', test: /node_modules/, minShareCount: 2 },
+								{ name: 'framework', test: FRAMEWORK, minShareCount: 2 },
+								{ name: packageOf, test: /node_modules/, minShareCount: 2 },
 								{
 									name: 'shared',
 									test: (id) => normalizePath(id).startsWith(SOURCE),

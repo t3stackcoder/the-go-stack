@@ -2,7 +2,10 @@ import { error } from '@sveltejs/kit';
 import { record } from '#lib/server/log.js';
 import type { RequestHandler } from './$types';
 
-/** Far more than a stack trace needs, and little enough that nobody can use this to fill a disk. */
+/**
+ * More than the reporter ever sends, because it cuts a long message or stack to fit (see
+ * src/lib/browser-errors.ts), and little enough that nobody can use this to fill a disk.
+ */
 const MAX_LENGTH = 8 * 1024;
 
 const FIELDS = ['reference', 'source', 'path', 'route', 'name', 'message', 'stack'] as const;

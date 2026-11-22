@@ -24,5 +24,21 @@ export function describeError(error: unknown): { name: string; message: string; 
 	if (error instanceof Error) {
 		return { name: error.name, message: error.message, stack: error.stack };
 	}
-	return { name: typeof error, message: String(error) };
+	return { name: typeof error, message: describe(error) };
+}
+
+/**
+ * A thrown value that is not an Error, as text. An object is written out as JSON, because `String`
+ * makes "[object Object]" of it. That is what was on record when a form library rejected with the
+ * `{ message }` SvelteKit had given it for a failed action: an error, and nothing about it. What
+ * cannot be written out (an object that refers to itself, say) is recorded by its type.
+ */
+function describe(value: unknown): string {
+	try {
+		const text =
+			typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+		return text ?? Object.prototype.toString.call(value);
+	} catch {
+		return Object.prototype.toString.call(value);
+	}
 }

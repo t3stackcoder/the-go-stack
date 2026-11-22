@@ -11,15 +11,24 @@
 	error hooks by the time it gets here, so what is shown is the safe message, and the error
 	itself is on record.
 
+	When the page's data is loaded again where the visitor stands, as it is after every form
+	submission, the box is given a new promise for what it is already showing. The value on show
+	stays until the new one has settled, and is then replaced where it sits. Measured before this
+	was so: a form posted beside a value that takes 800 ms blanked it for 800 ms each time, though
+	nothing about it had changed. At a different address the promise is for something else, and its
+	placeholder is shown at once.
+
 	One thing is not handled, because only the caller can: a promise that never settles. The
-	placeholder stays and the response stays open, for as long as the visitor does. Put a time limit
-	on a slow dependency where it is called (`AbortSignal.timeout`, for a fetch).
+	placeholder stays, or the value it was to replace, and the response stays open for as long as
+	the visitor does. Put a time limit on a slow dependency where it is called
+	(`AbortSignal.timeout`, for a fetch).
 
 	Not for pages with `csr = false`: without JavaScript a streamed value has nothing to render it.
 -->
 <script lang="ts" generics="T">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import type { ClassValue } from 'svelte/elements';
+	import { page } from '$app/state';
 	import Reserve from './Reserve.svelte';
 
 	let {
@@ -38,6 +47,35 @@
 		/** Shown on failure, with what the error hooks made of it. Defaults to a plain notice. */
 		failed?: Snippet<[unknown]>;
 	} = $props();
+
+	// The promise on show. The one the page gives takes its place at once, unless it is a fresh
+	// copy of the value already on show, which waits out of sight until it has settled.
+	let shown = $state.raw(untrack(() => promise));
+	// The address at which the value on show arrived, once one has. Bookkeeping, so not reactive.
+	let arrivedAt: string | undefined;
+
+	// Without the fragment, which a load function never sees: following a link to a heading on the
+	// page does not make its data a different thing.
+	const address = () => page.url.pathname + page.url.search;
+
+	$effect(() => {
+		const next = promise;
+
+		untrack(() => {
+			if (arrivedAt !== address()) shown = next;
+
+			const settle = (arrived: boolean) => {
+				// The page has given a newer promise since, and this one no longer matters.
+				if (next !== promise) return;
+				shown = next;
+				arrivedAt = arrived ? address() : undefined;
+			};
+			next.then(
+				() => settle(true),
+				() => settle(false)
+			);
+		});
+	});
 </script>
 
 {#snippet failure(error: unknown)}
@@ -51,7 +89,7 @@
 {/snippet}
 
 <Reserve class={className}>
-	{#await promise}
+	{#await shown}
 		{#if placeholder}
 			{@render placeholder()}
 		{:else}
