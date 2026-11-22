@@ -124,7 +124,9 @@
 	 * Colour. The default palette is removed so that every colour in the app is a semantic token
 	 * with a light and a dark value. A hard-coded `bg-gray-100` cannot be written by accident; black
 	 * and white, below, are the only fixed colours, for the components that need them.
-	 * Each pairing used for text is checked against WCAG AA (4.5:1); `ink` clears AAA (7:1).
+	 * Each pairing used for text is checked against WCAG AA (4.5:1); `ink` clears AAA (7:1). The
+	 * brand pairings are also checked with APCA, which judges saturated colours more as people see
+	 * them (see "Accents" below).
 	 */
 	--color-*: initial;
 
@@ -139,9 +141,13 @@
 	--color-ink-muted: light-dark(oklch(0.45 0.02 265), oklch(0.74 0.015 265));
 	--color-ink-subtle: light-dark(oklch(0.53 0.018 265), oklch(0.64 0.018 265));
 
-	/* `brand` is a fill; `brand-ink` is text on that fill; `brand-text` is brand-coloured text. */
-	--color-brand: light-dark(oklch(0.66 0.2 42), oklch(0.72 0.19 45));
-	--color-brand-ink: oklch(0.18 0.03 45);
+	/*
+	 * `brand` is a fill; `brand-ink` is text on that fill; `brand-text` is brand-coloured text.
+	 * These are the default accent, orange. The others are further down, under "Accents". The
+	 * fill is the same in both themes, and text on it is white for every accent.
+	 */
+	--color-brand: oklch(0.575 0.172 42);
+	--color-brand-ink: oklch(1 0 0);
 	--color-brand-text: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
 	--color-brand-soft: light-dark(oklch(0.955 0.03 50), oklch(0.3 0.03 45));
 
@@ -240,6 +246,75 @@
 			scroll-behavior: auto !important;
 			/* biome-ignore-end lint/complexity/noImportantStyles: the visitor's request for less motion */
 		}
+	}
+}
+
+/*
+ * Accents: the brand tokens again, for each colour in the picker (src/lib/theme/AccentPicker.svelte).
+ * The boot script in app.html puts the visitor's choice on <html> as `data-accent`, and orange is
+ * no attribute. The rules are not tied to <html>, so a swatch in the picker sets its own accent
+ * and its `bg-brand` is that colour, in whichever of light and dark is showing. That is why orange
+ * is repeated here: inside a page in another accent, its swatch has to be told it is orange.
+ *
+ * Every accent has the same shape: a mid-dark fill, the same in both themes, under white text
+ * (`brand-ink`, set once in @theme). Each pairing used for text passes two checks, in both themes:
+ * WCAG AA (4.5:1), and APCA Lc 60, the level APCA asks of text. The pairings are `brand-ink` on
+ * `brand`, `brand-text` on canvas, surface, sunken and `brand-soft`, and `ink` on `brand-soft`.
+ * The lowest are 4.71:1 (white on orange) and Lc 60 (pink and orange links in dark).
+ *
+ * Both checks matter. Under WCAG's formula alone, near-black text on these fills scored higher
+ * than white, and the first palette used it: but APCA put it at Lc 40 to 43 on purple, blue, red,
+ * pink and orange, and it looked as murky as that. Dark text cannot pass both: a fill light enough
+ * for it is too pale to stand out from the page. White passes both. Each fill is also at least
+ * 4:1 against the page in either theme, for the focus ring and the other marks drawn in it.
+ */
+@layer base {
+	[data-accent='orange'] {
+		--color-brand: oklch(0.575 0.172 42);
+		--color-brand-text: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 50), oklch(0.3 0.03 45));
+	}
+
+	[data-accent='red'] {
+		--color-brand: oklch(0.58 0.205 22);
+		--color-brand-text: light-dark(oklch(0.5 0.16 22), oklch(0.815 0.12 22));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 22), oklch(0.3 0.03 22));
+	}
+
+	[data-accent='amber'] {
+		--color-brand: oklch(0.56 0.117 75);
+		--color-brand-text: light-dark(oklch(0.5 0.11 75), oklch(0.8 0.13 75));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 75), oklch(0.3 0.03 75));
+	}
+
+	[data-accent='green'] {
+		--color-brand: oklch(0.54 0.147 150);
+		--color-brand-text: light-dark(oklch(0.5 0.13 150), oklch(0.8 0.15 150));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 150), oklch(0.3 0.03 150));
+	}
+
+	[data-accent='teal'] {
+		--color-brand: oklch(0.545 0.094 190);
+		--color-brand-text: light-dark(oklch(0.5 0.1 190), oklch(0.8 0.11 190));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 190), oklch(0.3 0.03 190));
+	}
+
+	[data-accent='blue'] {
+		--color-brand: oklch(0.56 0.17 258);
+		--color-brand-text: light-dark(oklch(0.5 0.18 258), oklch(0.8 0.11 258));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 258), oklch(0.3 0.03 258));
+	}
+
+	[data-accent='purple'] {
+		--color-brand: oklch(0.575 0.2 295);
+		--color-brand-text: light-dark(oklch(0.5 0.2 295), oklch(0.8 0.12 295));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 295), oklch(0.3 0.03 295));
+	}
+
+	[data-accent='pink'] {
+		--color-brand: oklch(0.58 0.195 350);
+		--color-brand-text: light-dark(oklch(0.5 0.18 350), oklch(0.8 0.12 350));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 350), oklch(0.3 0.03 350));
 	}
 }
 

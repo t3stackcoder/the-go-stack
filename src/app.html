@@ -7,38 +7,64 @@
 		<meta name="color-scheme" content="light dark" />
 		<!--
 			Runs before first paint, and ahead of everything SvelteKit adds to the head, so that
-			it is in the first piece of the page to arrive. It settles three things the server
-			cannot know: the theme (rationale in src/lib/theme/ThemeSwitch.svelte), the font
-			(rationale in src/routes/layout.css) and where a refreshed page was left (rationale
-			in src/lib/stable/scroll.ts).
+			it is in the first piece of the page to arrive. It settles four things the server
+			cannot know: the theme (rationale in src/lib/theme/ThemeSwitch.svelte), the accent
+			colour (src/lib/theme/AccentPicker.svelte), the font (rationale in
+			src/routes/layout.css) and where a refreshed page was left (rationale in
+			src/lib/stable/scroll.ts).
 		-->
 		<script>
 			(() => {
 				const root = document.documentElement;
 
-				const apply = (theme) => {
-					if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
-					else delete root.dataset.theme;
-				};
+				// A visitor's choice, kept in localStorage under `key` and shown as `data-<key>` on
+				// <html>, where the stylesheet reads it. The first value is the default: no attribute
+				// and nothing stored, so a value no longer offered falls back to it. Returns the
+				// function that makes a choice. Other open tabs are kept in step.
+				const setting = (key, [fallback, ...others]) => {
+					const apply = (value) => {
+						if (others.includes(value)) root.dataset[key] = value;
+						else delete root.dataset[key];
+					};
 
-				// Storage can be unavailable (blocked cookies, some private modes). The theme then
-				// simply follows the system and is not persisted, which is the correct degradation.
-				try {
-					apply(localStorage.getItem('theme'));
-				} catch {}
-
-				const choose = (theme) => {
-					if (theme === (root.dataset.theme ?? 'system')) return;
-					apply(theme);
+					// Storage can be unavailable (blocked cookies, some private modes). The default
+					// is then shown and the choice is not kept, which is the correct degradation.
 					try {
-						if (theme === 'system') localStorage.removeItem('theme');
-						else localStorage.setItem('theme', theme);
+						apply(localStorage.getItem(key));
 					} catch {}
+
+					addEventListener('storage', (event) => {
+						if (event.key === key) apply(event.newValue);
+					});
+
+					return (value) => {
+						if (value === (root.dataset[key] ?? fallback)) return;
+						apply(value);
+						try {
+							if (others.includes(value)) localStorage.setItem(key, value);
+							else localStorage.removeItem(key);
+						} catch {}
+					};
 				};
+
+				const chooseTheme = setting('theme', ['system', 'light', 'dark']);
+				// The accents in AccentPicker.svelte, default first; src/lib/theme/accents.test.ts checks.
+				const chooseAccent = setting('accent', [
+					'orange',
+					'red',
+					'amber',
+					'green',
+					'teal',
+					'blue',
+					'purple',
+					'pink'
+				]);
 
 				addEventListener('click', (event) => {
 					const theme = event.target.closest?.('[data-theme-set]')?.dataset.themeSet;
-					if (theme) choose(theme);
+					if (theme) chooseTheme(theme);
+					const accent = event.target.closest?.('[data-accent-set]')?.dataset.accentSet;
+					if (accent) chooseAccent(accent);
 				});
 
 				// The switch also slides: press anywhere on it and move across it, and the theme
@@ -48,7 +74,7 @@
 					if (!group) return;
 					const follow = ({ clientX, clientY }) => {
 						const option = document.elementFromPoint(clientX, clientY)?.closest('[data-theme-set]');
-						if (option && group.contains(option)) choose(option.dataset.themeSet);
+						if (option && group.contains(option)) chooseTheme(option.dataset.themeSet);
 					};
 					const stop = () => {
 						removeEventListener('pointermove', follow);
@@ -58,11 +84,6 @@
 					addEventListener('pointermove', follow);
 					addEventListener('pointerup', stop);
 					addEventListener('pointercancel', stop);
-				});
-
-				// Keep other open tabs in step.
-				addEventListener('storage', (event) => {
-					if (event.key === 'theme') apply(event.newValue);
 				});
 
 				// The font for this visit is settled when the first frame is drawn: Inter if it has

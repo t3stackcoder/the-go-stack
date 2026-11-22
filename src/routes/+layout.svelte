@@ -8,6 +8,7 @@
 	import { markHydrated } from '#lib/stable/hydration.svelte.js';
 	import { WAIT_FLAG } from '#lib/stable/late.js';
 	import { restoreScrollOnReload } from '#lib/stable/scroll.js';
+	import AccentPicker from '#lib/theme/AccentPicker.svelte';
 	import ThemeSwitch from '#lib/theme/ThemeSwitch.svelte';
 	import { onNavigate, snapshot } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -103,7 +104,7 @@
 
 <div class="flex min-h-dvh flex-col">
 	<header class="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
-		<div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-6 px-6">
+		<div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-6">
 			<a
 				href={resolve('/team-collaborator')}
 				class="flex shrink-0 items-center gap-2.5 font-display text-[0.9375rem] font-semibold tracking-tight"
@@ -126,9 +127,23 @@
 						<path d="M16 4.13a4 4 0 0 1 0 7.75M22 21a7 7 0 0 0-4.5-6.53" />
 					</svg>
 				</span>
-				Team Collaborator
+				<!--
+					Out of sight, though still read out, on a window too narrow for it beside the
+					controls: 369px, measured with the fallback font in WebKit, the widest of the three
+					engines (Inter in Chromium needs 353px). Without that, a 320px phone scrolled sideways.
+				-->
+				<span class="max-[23.125rem]:sr-only">Team Collaborator</span>
 			</a>
-			<ThemeSwitch />
+			<!--
+				A fixed width, written out as what it holds: the theme switch (5.625rem + 2px), a gap of
+				0.5rem and the accent button (2.125rem + 2px). Sized by its contents, it would be drawn
+				narrower if the first paint came before the button had arrived, and the switch would
+				then move left: the shift ThemeSwitch's own fixed width is there to prevent.
+			-->
+			<div class="flex w-[calc(8.25rem+4px)] shrink-0 items-center gap-2">
+				<ThemeSwitch />
+				<AccentPicker />
+			</div>
 		</div>
 	</header>
 
