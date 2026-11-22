@@ -4,7 +4,6 @@
 	import { settleEarlyRejections } from '#lib/browser-errors.js';
 	import { keepTyped, putBackTyped } from '#lib/forms/typed.js';
 	import Hud from '#lib/hud/Hud.svelte';
-	import { startMetrics } from '#lib/hud/metrics.svelte.js';
 	import { markHydrated } from '#lib/stable/hydration.svelte.js';
 	import { WAIT_FLAG } from '#lib/stable/late.js';
 	import { restoreScrollOnReload } from '#lib/stable/scroll.js';
@@ -19,7 +18,6 @@
 
 	onMount(() => {
 		markHydrated();
-		startMetrics();
 		settleEarlyRejections();
 		restoreScrollOnReload();
 
@@ -149,11 +147,24 @@
 
 	<!--
 		Focusable from script only, so that following the skip link moves focus here as well as the
-		view. The bottom padding keeps the last line clear of the pinned readout, taller on a phone.
+		view. In development, the bottom padding keeps the last line clear of the pinned readout,
+		which is taller on a phone.
 	-->
-	<main id="content" tabindex="-1" class="flex-1 scroll-mt-14 pb-32 outline-none sm:pb-24">
+	<main
+		id="content"
+		tabindex="-1"
+		class={['flex-1 scroll-mt-14 outline-none', import.meta.env.DEV && 'pb-32 sm:pb-24']}
+	>
 		{@render children()}
 	</main>
 </div>
 
-<Hud />
+<!--
+	The development readout, rendered with the page so it is on screen at first paint (see
+	src/lib/hud/Hud.svelte). The build replaces `import.meta.env.DEV` with `false`, and the readout
+	and its measuring are then dropped from a production build altogether. Not `dev` from
+	`$app/env`, which the bundler cannot see through: behind it, the readout stayed in the build.
+-->
+{#if import.meta.env.DEV}
+	<Hud />
+{/if}
