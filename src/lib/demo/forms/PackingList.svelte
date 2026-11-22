@@ -2,6 +2,9 @@
 	The packing list. Every control is a plain HTML form that posts to an action in
 	routes/forms/+page.server.ts, and works with no JavaScript at all. Once the page has hydrated,
 	`use:enhance` upgrades the same forms in place: there is no second version for when script runs.
+
+	The two fields take what the server sends back as their defaults (`defaultValue`), not as their
+	values. Hydration then leaves alone whatever the visitor typed while the page was still loading.
 -->
 <script lang="ts">
 	import { tick } from 'svelte';
@@ -40,13 +43,17 @@
 		}
 		adding = true;
 
-		return async ({ update }) => {
-			// The handling a plain post gets: on success the form is reset, on failure the server's
-			// answer lands in `form`. By default only a success reloads the page's data. Here a failure
-			// does too, because the server logs every attempt, including the ones it turns down.
-			await update({ refreshAll: true });
+		return async ({ result, formElement, update }) => {
+			// The handling a plain post gets, apart from the reset: the server's answer lands in
+			// `form` and the page's data is reloaded. By default only a success reloads it. Here a
+			// failure does too, because the server logs every attempt, including the ones it turns down.
+			await update({ refreshAll: true, reset: false });
 			adding = false;
 			await tick();
+			// The fields are reset here, once the answer is on the page, and not by `update`, which
+			// resets before it. A reset shows each field's default, and until this answer arrived the
+			// defaults were still whatever the server last sent back: a refused entry would reappear.
+			if (result.type === 'success') formElement.reset();
 			(form?.errors?.quantity && !form.errors.text ? quantityInput : textInput).focus();
 		};
 	};
@@ -110,7 +117,7 @@
 				bind:this={textInput}
 				id="{uid}-text"
 				name="text"
-				value={form?.values?.text ?? ''}
+				defaultValue={form?.values?.text ?? ''}
 				required
 				maxlength={MAX_TEXT}
 				autocomplete="off"
@@ -133,7 +140,7 @@
 				name="quantity"
 				type="number"
 				inputmode="numeric"
-				value={form?.values?.quantity ?? '1'}
+				defaultValue={form?.values?.quantity ?? '1'}
 				required
 				min="1"
 				max={MAX_QUANTITY}

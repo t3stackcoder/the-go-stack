@@ -83,7 +83,11 @@
 	</a>
 
 	<nav aria-label="Data demos" class="mt-6">
-		<ul class="inline-flex gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
+		<!--
+			A block that hugs its tabs, not an inline box. A page can be painted while its HTML is
+			still arriving, and an inline box drawn empty moved up when its tabs turned up.
+		-->
+		<ul class="flex w-fit gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
 			{#each demos as candidate (candidate.path)}
 				<li>
 					<!-- The streaming demo times a full page load, so links to it always make one. -->

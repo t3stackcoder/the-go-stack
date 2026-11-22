@@ -1,17 +1,29 @@
 <script lang="ts">
 	import DemoFrame from '#lib/demo/data/DemoFrame.svelte';
+	import { addressForm } from '#lib/forms/address-form.js';
+	import formSource from '#lib/forms/address-form.ts?highlight';
 	import type { PageProps } from './$types';
 	import pageSource from './+page.svelte?highlight';
 	import serverSource from './+page.server.ts?highlight';
 
 	let { data }: PageProps = $props();
+
+	// The box takes the query as its default, not its value, so what a visitor types while the
+	// page is still loading survives hydration. `addressForm` then sends it, and shows the
+	// address's query again after a link or Back.
+	let form: HTMLFormElement;
+	addressForm(
+		() => form,
+		(fields) => fields.get('q') === data.query
+	);
 </script>
 
 <DemoFrame
 	path="/data/search"
 	files={[
 		{ html: serverSource, file: 'src/routes/data/search/+page.server.ts' },
-		{ html: pageSource, file: 'src/routes/data/search/+page.svelte' }
+		{ html: pageSource, file: 'src/routes/data/search/+page.svelte' },
+		{ html: formSource, file: 'src/lib/forms/address-form.ts' }
 	]}
 >
 	<!--
@@ -19,14 +31,20 @@
 		makes the same request as a client-side navigation. `reset={false}` keeps focus and scroll
 		where they are, and `replacestate` stops every keystroke adding a history entry.
 	-->
-	<form method="GET" role="search" data-sveltekit-reset={false} data-sveltekit-replacestate>
+	<form
+		bind:this={form}
+		method="GET"
+		role="search"
+		data-sveltekit-reset={false}
+		data-sveltekit-replacestate
+	>
 		<label for="q" class="text-sm font-medium">Search by code, phrase or kind</label>
 		<div class="mt-2 flex gap-2">
 			<input
 				id="q"
 				name="q"
 				type="search"
-				value={data.query}
+				defaultValue={data.query}
 				placeholder="Try 404 or “not”"
 				autocomplete="off"
 				spellcheck="false"

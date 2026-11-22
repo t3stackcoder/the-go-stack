@@ -49,12 +49,22 @@
 	</a>
 
 	<nav aria-label="Rendering modes" class="mt-6">
-		<ul class="inline-flex gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
+		<!--
+			A block that hugs its tabs, not an inline box. A page can be painted while its HTML is
+			still arriving, and an inline box drawn empty moved up when its tabs turned up.
+		-->
+		<ul class="flex w-fit gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
 			{#each modes as candidate (candidate.path)}
 				<li>
+					<!--
+						The link to the server-only page always makes a full page load. `csr = false` is a
+						setting the server reads. A page already running in the browser cannot see it, and
+						would render that page itself: with JavaScript, and a readout that wakes up.
+					-->
 					<a
 						href={resolve(candidate.path)}
 						aria-current={candidate.path === path ? 'page' : undefined}
+						data-sveltekit-reload={candidate.path === '/rendering/server' ? true : undefined}
 						class="block rounded-lg px-3 py-1.5 whitespace-nowrap text-ink-muted hover:text-ink aria-[current]:bg-surface aria-[current]:font-medium aria-[current]:text-ink aria-[current]:shadow-sm"
 					>
 						{candidate.tab}

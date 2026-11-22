@@ -6,6 +6,13 @@
 	stored choice, so anything rendered from component state here would be wrong in the HTML and
 	corrected after hydration: a visible flicker. Deriving it in CSS makes it right at first paint,
 	on every kind of page, including pages that ship no JavaScript.
+
+	The group has a fixed width, written out as what it holds: three buttons of 1.625rem, two gaps
+	and two paddings of 0.125rem, and a border of 1px on each side. It is the first thing in the
+	page that is pushed to the right, and a page's first paint can come while its HTML is still
+	arriving. Sized by its contents, the group was then drawn with one button and moved left as the
+	others turned up: a layout shift, recorded on 6 of 16 loads over a slow connection. Change the
+	options, and the width has to be changed with them.
 -->
 <script lang="ts" module>
 	const options = [
@@ -18,7 +25,7 @@
 <div
 	role="group"
 	aria-label="Theme"
-	class="flex h-8 items-center gap-0.5 rounded-full border border-line bg-sunken p-0.5"
+	class="flex h-8 w-[calc(5.375rem+2px)] shrink-0 items-center gap-0.5 rounded-full border border-line bg-sunken p-0.5"
 >
 	{#each options as option (option.value)}
 		<button

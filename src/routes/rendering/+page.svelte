@@ -48,8 +48,13 @@
 	<ul class="grid gap-4 lg:grid-cols-3">
 		{#each modes as mode (mode.path)}
 			<li>
+				<!--
+					The server-only page is always reached by a full page load. Reached by a client-side
+					navigation it would be rendered in the browser, which is what it exists not to be.
+				-->
 				<a
 					href={resolve(mode.path)}
+					data-sveltekit-reload={mode.path === '/rendering/server' ? true : undefined}
 					class="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 hover:border-line-strong"
 				>
 					<p class="font-mono text-xs text-accent-text">{mode.setting}</p>
