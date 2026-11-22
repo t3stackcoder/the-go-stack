@@ -95,6 +95,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// it, and the browser must ask again before showing its copy. Without the header a browser
 	// decides for itself how long the page stays fresh. A page that can be kept longer says so
 	// from its `load` function, with `setHeaders`, and that is left alone.
+	//
+	// Back and Forward are the exception no header short of `no-store` closes: a browser may show
+	// its copy there without asking. Measured in Chromium and Firefox, and settled in the root
+	// layout, where a page come back to asks for its data again.
 	if (
 		!response.headers.has('cache-control') &&
 		response.headers.get('content-type')?.startsWith('text/html')

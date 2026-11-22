@@ -1,10 +1,11 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
-	import { onNavigate } from '$app/navigation';
+	import { onNavigate, snapshot } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { settleEarlyRejections } from '#lib/browser-errors.js';
+	import { keepTyped, putBackTyped } from '#lib/forms/typed.js';
 	import Hud from '#lib/hud/Hud.svelte';
 	import { startMetrics } from '#lib/hud/metrics.svelte.js';
 	import { chapters } from '#lib/site/chapters.js';
@@ -21,7 +22,23 @@
 		startMetrics();
 		settleEarlyRejections();
 		restoreScrollOnReload();
+
+		// A page come back to by Back or Forward is often the browser's own copy of it, as it
+		// first arrived, and anything saved since is not on it. Measured in Chromium and Firefox:
+		// a party added to a list, the site left by a full page load, Back pressed, and the party
+		// was missing from the list 3 times of 3, though the server had it. So such a page asks
+		// for its data again. The code that asks is fetched only then, and a reload that fails
+		// leaves the page as it is.
+		const [arrival] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+		if (arrival?.type === 'back_forward') {
+			void import('#lib/forms/reload.svelte.js').then(({ reloadData }) => reloadData());
+		}
 	});
+
+	// What a visitor has typed into a form is still there when they come back to the page, as it
+	// would be in a browser left to itself. Registered here, once, so that no page with a form
+	// can forget to (see src/lib/forms/typed.ts).
+	snapshot({ id: 'typed', capture: keepTyped, restore: putBackTyped });
 
 	// Cross-fade between pages instead of a hard cut. Shallow navigations change no content, and
 	// people who ask for reduced motion get the hard cut they asked for.
@@ -33,12 +50,14 @@
 		// Verdict page). That is an update to the page in front of you, not a new page to fade to.
 		if (navigation.from?.route.id === navigation.to?.route.id) return;
 
-		// Not from a page that fits in the window. In the test build of Safari's engine, on
-		// Windows, a cross-fade away from a page that does not scroll crashed the tab: 3 runs of
-		// 3, for every such page, and never with the cross-fade skipped. Real Safari has not been
-		// tried. If it shows any other trouble, the cross-fade goes altogether.
-		const root = document.documentElement;
-		if (root.scrollHeight <= root.clientHeight) return;
+		// Not in Safari's engine, which is every browser on an iPhone. Its test build, on
+		// Windows, has broken on the cross-fade in two ways. A cross-fade away from a page that
+		// fits in the window crashed the tab, 3 runs of 3. And once any cross-fade had run,
+		// going Back to a page that loads data left the tab not answering: 22 tries of 50 across
+		// five pages, and none of 15 with the cross-fade off. A visitor coming back to a form
+		// found a page they could not type into. Real Safari has not been tried. Until it has,
+		// a hard cut that works is the better of the two.
+		if (navigator.vendor.startsWith('Apple')) return;
 
 		return new Promise((resolve) => {
 			document.startViewTransition(async () => {

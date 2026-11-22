@@ -32,12 +32,25 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (typeof report !== 'object' || report === null) error(400, 'The report is not an object.');
 
 	const fields = report as Record<string, unknown>;
-	record('error', 'unexpected error in the browser', {
-		...Object.fromEntries(
-			FIELDS.filter((name) => typeof fields[name] === 'string').map((name) => [name, fields[name]])
-		),
-		userAgent: request.headers.get('user-agent')
-	});
+
+	// A form whose answer could not be read is a connection that dropped, or something in front
+	// of the server answering in its place. Neither is a fault in the site's code, so it is
+	// recorded as information: a run of them is worth noticing, and one is not. Measured before
+	// this: every visitor who lost their connection mid-form was on record as an unexpected error.
+	const unanswered = fields.source === 'form';
+	record(
+		unanswered ? 'info' : 'error',
+		unanswered ? 'form unanswered in the browser' : 'unexpected error in the browser',
+		{
+			...Object.fromEntries(
+				FIELDS.filter((name) => typeof fields[name] === 'string').map((name) => [
+					name,
+					fields[name]
+				])
+			),
+			userAgent: request.headers.get('user-agent')
+		}
+	);
 
 	return new Response(null, { status: 204 });
 };

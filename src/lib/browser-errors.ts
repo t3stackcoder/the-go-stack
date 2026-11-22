@@ -9,8 +9,11 @@ import { describeError, errorReference } from '#lib/errors.js';
 import { hydration } from '#lib/stable/hydration.svelte.js';
 
 interface Origin {
-	/** Where it was caught: by the router, or by the window event of this name. */
-	source: 'navigation' | 'error' | 'unhandledrejection';
+	/**
+	 * Where it was caught: by the router, by the router while a form waited for its answer, or
+	 * by the window event of this name.
+	 */
+	source: 'navigation' | 'form' | 'error' | 'unhandledrejection';
 	path: string;
 	route: string | null;
 }
@@ -28,6 +31,10 @@ const MAX_STACK = 4000;
 export function reportError(error: unknown, origin: Origin): string {
 	const reference = errorReference();
 	const { name, message, stack } = describeError(error);
+
+	// With no connection there is nothing to deliver it over, and WebKit writes an error of its
+	// own to the console for being asked.
+	if (!navigator.onLine) return reference;
 
 	// A beacon is handed to the browser to deliver, so it still arrives if the visitor leaves the
 	// page. It returns false when the browser refuses it, and there is then nowhere left to say so.

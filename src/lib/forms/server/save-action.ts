@@ -20,9 +20,18 @@
  * Everything typed is sent back, whatever the field. A form with a secret in it, a password,
  * needs a way to leave that field out, and this does not have one yet.
  *
+ * A post can arrive twice for one press: a browser sends one again by itself when the connection
+ * fails before any answer has come, and a visitor told that no answer came sends again what may
+ * be saved already. `saveAction` knows a repeat for what it is, and gives it the answer the first
+ * was given without saving again (see ./once.ts). That holds on one server and while it runs.
+ * Where a repeat can reach another server, or this one after a restart, the action has to be
+ * safe by itself: write a state and not a change ("aboard: yes", never "flip it"), or turn down
+ * what is already there, as the `add` above does.
+ *
  * This directory is named `server`, so SvelteKit refuses to bundle it into browser code.
  */
 import {
+	error,
 	fail,
 	isHttpError,
 	isRedirect,
@@ -31,6 +40,7 @@ import {
 } from '@sveltejs/kit';
 import type * as z from 'zod';
 import { recordFault, recordRefusal } from '#lib/server/faults.js';
+import { saveOnce } from './once.js';
 
 /** A schema for a form: an object with one key for each field name. */
 type FormSchema = z.ZodObject;
@@ -75,10 +85,14 @@ export interface Refusal<Name extends string = string, Schema extends FormSchema
 
 /**
  * The most a form's fields may hold. More than this is turned down, with a message, whatever the
- * schema would have said. The limit is on what is sent back: everything typed returns to the
- * page with a refusal, and a visitor without JavaScript gets their fields from that. Cut short
- * without a word, a long entry would be sent again, shortened, and saved that way. Measured
- * before this was a refusal: a name of 100 characters came back as 60 and was saved as 60.
+ * schema would have said.
+ *
+ * What was over the limit goes back to the page whole, like everything else that was typed: a
+ * visitor without JavaScript gets their fields from that, and what they are given is what they
+ * send next. It was once cut to the limit on its way back. Measured then, without JavaScript: a
+ * name of 61 characters was turned down and came back as 60, and sent again as it stood it was
+ * saved as 60. The end of what had been typed was gone, and nothing on the page said so. What
+ * bounds a post, and so what can come back, is the server's own limit on a request's size.
  */
 export interface FieldLimits {
 	/** The most characters one field may hold. Default 1000. */
@@ -113,13 +127,20 @@ export function refuse(errors: Record<string, string>): never {
 }
 
 /**
- * Stops the action if nobody is waiting for its answer any more: the visitor sent the form again
- * and the browser abandoned this request, or gave up waiting, or left. Call it just before
- * writing. It returns only if the request still stands.
+ * Stops the action if nobody is waiting for its answer any more: the form gave up on it at its
+ * time limit, or the visitor left the page, or pressed twice without JavaScript and the browser
+ * dropped the first for the second. Call it just before writing. It returns only if the
+ * request still stands.
  *
- * Abandoning a request in the browser does not stop the action that is answering it. Measured on
- * the packing list: three quick ticks, two abandoned in the browser, and all three ran to the end
- * on the server. Written in the order they finish, an older answer lands on top of a newer one.
+ * Abandoning a request in the browser does not stop the action that is answering it. Measured
+ * with three quick presses of one control, two of them abandoned in the browser: all three ran
+ * to the end on the server. Unless the action looks, it saves after the visitor has been told
+ * that no answer came.
+ *
+ * It can only look where it can see. A proxy that does not pass a browser's hanging up on to the
+ * server hides it, and then this returns for a request nobody is waiting for. That is why the
+ * helper no longer relies on it to keep two presses of one control in order (it sends them one
+ * at a time), and why a repeat of a press is known by its key (see ./once.ts).
  */
 export function stopIfAbandoned(event: Pick<RequestEvent, 'request'>): void {
 	if (event.request.signal.aborted) throw new Abandoned();
@@ -148,8 +169,8 @@ export function stopIfAbandoned(event: Pick<RequestEvent, 'request'>): void {
  * - `save` threw anything else: a fault, recorded like any other, and answered with status 500
  *   and the sentence and reference a visitor is shown for one.
  *
- * A redirect goes through untouched. So does a failure to read the request at all, which is not
- * the action's to explain.
+ * A redirect goes through untouched. A request that cannot be read as a form is turned away
+ * with status 400, and one that was given up on before it had arrived is answered to nobody.
  */
 export function saveAction<
 	Name extends string,
@@ -173,7 +194,30 @@ export function saveAction<
 			);
 		}
 
-		const fields = await event.request.formData();
+		let fields: FormData;
+		try {
+			fields = await event.request.formData();
+		} catch (unread) {
+			// Given up on while it was still arriving. Nobody is waiting for an answer, and a
+			// visitor who went away is no fault of the server's. Measured before this was
+			// caught: each one was recorded as an unexpected error, with a reference.
+			if (event.request.signal.aborted) {
+				return fail<Refusal<Name, Schema>>(499, {
+					refused: true,
+					action: name,
+					values: {} as Echo<Schema>,
+					errors: {}
+				});
+			}
+			// Not a form at all: text, or parts that do not add up. No browser sends one, and
+			// it is the sender's mistake, so it is turned away as that. Measured before: each
+			// was answered with status 500 and recorded as a fault.
+			if (unread instanceof TypeError) error(400, 'What was sent could not be read as a form.');
+			// Anything else is not the action's to explain: too large a post, which SvelteKit
+			// turns away itself, or a fault.
+			throw unread;
+		}
+
 		const { raw, values, tooMuch } = read(fields, schema, limits);
 		// The keys of `errors` are meant to be field names: they come from the schema's own
 		// complaints, from the limits, or from a call to `refuse` in the action.
@@ -201,7 +245,8 @@ export function saveAction<
 				return refusal(400, errors, message);
 			}
 
-			return await save(checked.data, event);
+			// Once for one press, however many times the press arrives.
+			return await saveOnce(event, fields, () => save(checked.data, event));
 		} catch (thrown) {
 			if (isRedirect(thrown)) throw thrown;
 			if (thrown instanceof Refused) return refusal(400, thrown.errors);
@@ -260,9 +305,7 @@ function kindOf(field: unknown): 'list' | 'checkbox' | 'text' | 'value' {
 
 /**
  * The posted fields the schema names, as the schema should be given them and as they are sent
- * back, with what was over a limit. Fields the schema does not name are dropped. Nothing is sent
- * back longer than its limit, so an oversized post does not come straight back into the page,
- * and whatever was cut is turned down with a message and never passed off as what was typed.
+ * back, with what was over a limit. Fields the schema does not name are dropped.
  */
 function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limits: FieldLimits) {
 	const { text: maxText = 1000, list: maxList = 1000 } = limits;
@@ -274,8 +317,7 @@ function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limit
 	const posted = (value: FormDataEntryValue | null) =>
 		typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : value;
 	// A file cannot be put back into a field, so there is nothing of it to send back.
-	const clip = (value: FormDataEntryValue | null) =>
-		typeof value === 'string' ? value.slice(0, maxText) : '';
+	const typed = (value: FormDataEntryValue | null) => (typeof value === 'string' ? value : '');
 	const tooLong = (value: FormDataEntryValue | null) =>
 		typeof value === 'string' && value.length > maxText;
 
@@ -290,8 +332,8 @@ function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limit
 		if (kind === 'list') {
 			const all = fields.getAll(name).map(posted);
 			raw[name] = all;
-			values[name] = all.slice(0, maxList).map(clip);
-			all.slice(0, maxList).forEach((value, position) => {
+			values[name] = all.map(typed);
+			all.forEach((value, position) => {
 				if (tooLong(value)) tooMuch.errors[`${name}.${position}`] = long;
 			});
 			if (all.length > maxList) {
@@ -304,7 +346,7 @@ function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limit
 			// An empty field is the empty string where text is wanted, and no value anywhere else.
 			raw[name] =
 				kind === 'text' ? (value ?? '') : value === '' || value === null ? undefined : value;
-			values[name] = clip(value);
+			values[name] = typed(value);
 			if (tooLong(value)) tooMuch.errors[name] = long;
 		}
 	}

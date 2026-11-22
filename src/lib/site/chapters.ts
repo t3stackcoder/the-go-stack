@@ -29,7 +29,8 @@ export const chapters = [
 		number: '04',
 		title: 'Forms',
 		headline: 'Forms that work before JavaScript does',
-		blurb: 'Plain HTML forms, upgraded in place. Turn JavaScript off and they still submit.'
+		blurb:
+			'Plain HTML forms, upgraded in place. Break the server or turn JavaScript off, and they hold.'
 	},
 	{
 		path: '/stability',

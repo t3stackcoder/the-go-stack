@@ -2,14 +2,18 @@
 // what does the server end up holding, and what is the page left showing?
 //
 // The action is slower the lower the number it is given, so three quick submissions of 1, 2 and 3
-// would be answered in the opposite order: 3 first, 1 last. A form that has just saved 3 could
-// find the server holding 1. The form's helper allows two rules, and neither lets that happen:
+// sent together would be answered in the opposite order: 3 first, 1 last. A form that has just
+// saved 3 could find the server holding 1. The form's helper allows two rules, and neither lets
+// that happen:
 //
 //   /stress/forms/burst                a send before the answer is ignored: 1 is saved
-//   /stress/forms/burst?again=replace  a new send abandons the one before: 3 is saved
+//   /stress/forms/burst?again=replace  the newest send takes the place of those before it. 1 is
+//                                      let finish, 2 is never sent, and 3 goes when 1 is
+//                                      answered: 3 is saved, and is the last thing written
 //
-// Abandoning a request in the browser does not stop the action that is answering it. The action
-// below finds out with `stopIfAbandoned`, just before it writes, and leaves what is held alone.
+// A request is abandoned only when the form gives up on it at its time limit.
+// Abandoning one in the browser does not stop the action that is answering it. The action below
+// finds out with `stopIfAbandoned`, just before it writes, and leaves what is held alone.
 //
 // What is held is shared by everyone using this page, and starts again when the form is reset.
 import { redirect } from '@sveltejs/kit';
@@ -42,9 +46,9 @@ export const actions = {
 		await wait(900 - 250 * Math.min(value, 3));
 		arrival.finished = true;
 
-		// The browser has stopped waiting for this answer, because a newer submission took its
-		// place. Written now, an older value would land on top of a newer one. Measured before
-		// this check: the page said "saved 3" and the server held 1.
+		// The browser has stopped waiting for this answer: the form gave up on it. Written now,
+		// it would land after the visitor was told that no answer came, and perhaps on top of
+		// what they sent next.
 		try {
 			stopIfAbandoned(event);
 		} catch (stopped) {
