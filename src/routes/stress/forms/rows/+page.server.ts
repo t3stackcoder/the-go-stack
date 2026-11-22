@@ -1,14 +1,17 @@
 // Question: what does a form of hundreds of fields cost to send, to hydrate and to type into, when
-// the browser holds every value? Its twin, /stress/superforms/rows, is the same table with every
-// value held in a Superforms store.
+// the browser holds every value? And is every row saved, and every row kept through a refusal,
+// with JavaScript and without?
 //
 //   /stress/forms/rows?n=500    five hundred rows of three fields each
-import { fail } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+//
+// The rows are posted as repeated field names, never as JSON: JSON needs JavaScript to be sent
+// at all. Measured on a form that posted its rows as JSON: without JavaScript nothing arrived,
+// and the server answered "Saved 0 rows."
+import * as z from 'zod';
+import { saveAction } from '#lib/forms/server/save-action.js';
+import type { PageServerLoad } from './$types';
 
 const MAX = 2000;
-/** Echoed values are clipped, so an oversized post is not sent straight back into the page. */
-const ECHO_LIMIT = 60;
 
 export const load: PageServerLoad = ({ url }) => {
 	const count = Math.min(MAX, Math.max(0, Number(url.searchParams.get('n') ?? 100) || 0));
@@ -25,42 +28,25 @@ export const load: PageServerLoad = ({ url }) => {
 	};
 };
 
-const texts = (fields: FormData, name: string) =>
-	fields
-		.getAll(name)
-		.slice(0, MAX)
-		.map((value) => (typeof value === 'string' ? value : '').slice(0, ECHO_LIMIT));
-
-const isAmount = (text: string) => /^\d+(\.\d+)?$/.test(text.trim());
-const isCount = (text: string) => /^\d+$/.test(text.trim());
+// A list for each column. A message for the fourth price is filed under `price.3`.
+const Rows = z.object({
+	name: z.array(z.string().trim().min(1, 'A name is needed.')).max(MAX),
+	price: z
+		.array(
+			z
+				.string()
+				.trim()
+				.regex(/^\d+(\.\d+)?$/, 'The price must be a number.')
+		)
+		.max(MAX),
+	stock: z.array(z.string().trim().regex(/^\d+$/, 'The stock must be a whole number.')).max(MAX)
+});
 
 export const actions = {
-	save: async ({ request }) => {
-		const fields = await request.formData();
-		const names = texts(fields, 'name');
-		const prices = texts(fields, 'price');
-		const stocks = texts(fields, 'stock');
-
-		const rows = names.map((name, index) => ({
-			name,
-			price: prices[index] ?? '',
-			stock: stocks[index] ?? ''
-		}));
-
-		// One message a row, under the row's position, and only for the rows that have one.
-		const errors: Record<number, string> = {};
-		rows.forEach((row, index) => {
-			if (row.name.trim() === '') errors[index] = 'A name is needed.';
-			else if (!isAmount(row.price)) errors[index] = 'The price must be a number.';
-			else if (!isCount(row.stock)) errors[index] = 'The stock must be a whole number.';
-		});
-
-		const refused = Object.keys(errors).length;
-		if (refused) {
-			// Everything typed goes back, so a page with no JavaScript can show it again.
-			return fail(400, { rows, errors, message: `${refused} of ${rows.length} rows refused.` });
-		}
-
-		return { message: `Saved ${rows.length} rows.` };
-	}
-} satisfies Actions;
+	// Everything typed goes back after a refusal, so a page with no JavaScript can show it again:
+	// every row, and each value up to the length a field of this table can reasonably hold.
+	save: saveAction('save', Rows, ({ name }) => ({ message: `Saved ${name.length} rows.` }), {
+		text: 60,
+		list: MAX
+	})
+};

@@ -46,7 +46,7 @@
 		Click
 	</button>
 
-	<Streamed promise={data.late} class="mt-6 h-10">
+	<Streamed value={data.late} class="mt-6 h-10">
 		{#snippet children(value)}
 			<p data-late class="self-center text-sm">
 				{data.when === 'streamed' ? fail('streamed') : value}

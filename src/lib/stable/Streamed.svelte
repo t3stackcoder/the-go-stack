@@ -1,15 +1,18 @@
 <!--
 	Data that arrives after the page does, in a box reserved for it.
 
-	Pass a promise returned un-awaited from a server `load`. The page is sent immediately with the
-	placeholder in place, and the value is streamed into the same response when it resolves.
+	Pass what a server `load` got back from `streaming` (src/lib/server/streaming.ts). For most
+	visitors that is a promise: the page is sent immediately with the placeholder in place, and the
+	value is streamed into the same response when it settles. For a visitor without JavaScript it
+	is what the promise settled as, because the server waited, and the value or the failure notice
+	is in the HTML.
 
-	Every way it can go wrong ends in the same box, so none of them can shift the page: the promise
-	rejects, or its value arrives and cannot be rendered. The second is caught here and not left to
-	the page, because it happens after the page has rendered, where nothing else would catch it.
-	Uncaught, it left the placeholder pulsing for good. Either way the error has been through the
-	error hooks by the time it gets here, so what is shown is the safe message, and the error
-	itself is on record.
+	Every way it can go wrong ends in the same box, so none of them can shift the page: the data
+	fails, it takes longer than the time limit `streaming` was given, or its value arrives and
+	cannot be rendered. The last is caught here and not left to the page, because it happens after
+	the page has rendered, where nothing else would catch it. Uncaught, it left the placeholder
+	pulsing for good. Either way the error has been recorded by the time it gets here, so what is
+	shown is the safe message.
 
 	When the page's data is loaded again where the visitor stands, as it is after every form
 	submission, the box is given a new promise for what it is already showing. The value on show
@@ -18,27 +21,25 @@
 	nothing about it had changed. At a different address the promise is for something else, and its
 	placeholder is shown at once.
 
-	One thing is not handled, because only the caller can: a promise that never settles. The
-	placeholder stays, or the value it was to replace, and the response stays open for as long as
-	the visitor does. Put a time limit on a slow dependency where it is called
-	(`AbortSignal.timeout`, for a fetch).
-
-	Not for pages with `csr = false`: without JavaScript a streamed value has nothing to render it.
+	A bare promise from a `load` that did not go through `streaming` is shown too, but has neither
+	the time limit nor the page without JavaScript: one that never settles leaves the placeholder
+	up and the response open for as long as the visitor stays.
 -->
 <script lang="ts" generics="T">
 	import { untrack, type Snippet } from 'svelte';
 	import type { ClassValue } from 'svelte/elements';
 	import { page } from '$app/state';
+	import type { Late } from './late.js';
 	import Reserve from './Reserve.svelte';
 
 	let {
-		promise,
+		value,
 		class: className,
 		children,
 		placeholder,
 		failed
 	}: {
-		promise: Promise<T>;
+		value: Late<T>;
 		/** Sizes the reserved box. Must fix its height: `h-48`, `aspect-video`, and so on. */
 		class: ClassValue;
 		children: Snippet<[T]>;
@@ -48,9 +49,9 @@
 		failed?: Snippet<[unknown]>;
 	} = $props();
 
-	// The promise on show. The one the page gives takes its place at once, unless it is a fresh
-	// copy of the value already on show, which waits out of sight until it has settled.
-	let shown = $state.raw(untrack(() => promise));
+	// What is on show. What the page gives takes its place at once, unless it is a promise for a
+	// fresh copy of the value already on show, which waits out of sight until it has settled.
+	let shown = $state.raw(untrack(() => value));
 	// The address at which the value on show arrived, once one has. Bookkeeping, so not reactive.
 	let arrivedAt: string | undefined;
 
@@ -59,14 +60,21 @@
 	const address = () => page.url.pathname + page.url.search;
 
 	$effect(() => {
-		const next = promise;
+		const next = value;
 
 		untrack(() => {
+			// Already settled, on the server: there is nothing to wait for.
+			if (!(next instanceof Promise)) {
+				shown = next;
+				arrivedAt = next.late === 'arrived' ? address() : undefined;
+				return;
+			}
+
 			if (arrivedAt !== address()) shown = next;
 
 			const settle = (arrived: boolean) => {
-				// The page has given a newer promise since, and this one no longer matters.
-				if (next !== promise) return;
+				// The page has given something newer since, and this one no longer matters.
+				if (next !== value) return;
 				shown = next;
 				arrivedAt = arrived ? address() : undefined;
 			};
@@ -77,6 +85,12 @@
 		});
 	});
 </script>
+
+{#snippet arrival(arrived: T)}
+	<svelte:boundary failed={failure}>
+		<div class="reserve-content">{@render children(arrived)}</div>
+	</svelte:boundary>
+{/snippet}
 
 {#snippet failure(error: unknown)}
 	{#if failed}
@@ -89,17 +103,23 @@
 {/snippet}
 
 <Reserve class={className}>
-	{#await shown}
-		{#if placeholder}
-			{@render placeholder()}
+	{#if !(shown instanceof Promise)}
+		{#if shown.late === 'arrived'}
+			{@render arrival(shown.value)}
 		{:else}
-			<div class="skeleton"></div>
+			{@render failure(shown.error)}
 		{/if}
-	{:then value}
-		<svelte:boundary failed={failure}>
-			<div class="reserve-content">{@render children(value)}</div>
-		</svelte:boundary>
-	{:catch error}
-		{@render failure(error)}
-	{/await}
+	{:else}
+		{#await shown}
+			{#if placeholder}
+				{@render placeholder()}
+			{:else}
+				<div class="skeleton"></div>
+			{/if}
+		{:then arrived}
+			{@render arrival(arrived)}
+		{:catch error}
+			{@render failure(error)}
+		{/await}
+	{/if}
 </Reserve>

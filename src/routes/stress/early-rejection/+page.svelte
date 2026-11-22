@@ -13,7 +13,7 @@
 	<h1 class="font-display text-3xl font-semibold tracking-tight">
 		A rejection nobody was listening for
 	</h1>
-	<Streamed promise={data.late} class="mt-6 h-10">
+	<Streamed value={data.late} class="mt-6 h-10">
 		<p class="self-center text-sm">It arrived.</p>
 	</Streamed>
 	<p class="mt-6 text-sm text-ink-muted">If you can read this, the server survived.</p>

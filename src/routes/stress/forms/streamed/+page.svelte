@@ -1,10 +1,12 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { saveForm } from '#lib/forms/save-form.svelte.js';
 	import Streamed from '#lib/stable/Streamed.svelte';
 	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
+
+	const add = saveForm({ answer: () => form });
 </script>
 
 <svelte:head>
@@ -14,19 +16,34 @@
 <div class="mx-auto max-w-6xl px-6 pt-10 pb-12">
 	<h1 class="font-display text-3xl font-semibold tracking-tight">A form beside a streamed value</h1>
 
+	<!-- The query is repeated: without JavaScript the answer lands on the action's address. -->
 	<form
 		method="POST"
 		action="?/add{data.elsewhere ? '&elsewhere' : ''}"
-		use:enhance
+		{@attach add.attach}
 		class="mt-6 flex items-center gap-4 text-sm"
 	>
-		<button class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink">Add one</button>
+		<button
+			data-busy={add.busy}
+			aria-disabled={add.busy}
+			class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink aria-disabled:cursor-progress"
+		>
+			Add one
+		</button>
 		<p class="tabular-nums">Count: <span data-count>{data.count}</span></p>
+		<p
+			data-status
+			data-state={add.status}
+			role="status"
+			class={['h-5 truncate', add.failed && 'text-bad']}
+		>
+			{add.message}
+		</p>
 	</form>
 
 	<section class="mt-6 rounded-lg border border-line p-4">
 		<h2 class="text-sm font-medium">Streamed, and nothing to do with the form</h2>
-		<Streamed promise={data.slow} class="mt-2 h-10">
+		<Streamed value={data.slow} class="mt-2 h-10">
 			{#snippet children(value)}
 				<p data-settled class="self-center text-sm">{value}</p>
 			{/snippet}

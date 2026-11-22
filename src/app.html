@@ -7,9 +7,10 @@
 		<meta name="color-scheme" content="light dark" />
 		<!--
 			Runs before first paint, and ahead of everything SvelteKit adds to the head, so that
-			it is in the first piece of the page to arrive. It settles two things the server
-			cannot know: the theme (rationale in src/lib/theme/ThemeSwitch.svelte) and the font
-			(rationale in src/routes/layout.css).
+			it is in the first piece of the page to arrive. It settles three things the server
+			cannot know: the theme (rationale in src/lib/theme/ThemeSwitch.svelte), the font
+			(rationale in src/routes/layout.css) and where a refreshed page was left (rationale
+			in src/lib/stable/scroll.ts).
 		-->
 		<script>
 			(() => {
@@ -87,6 +88,22 @@
 					// sent ahead of the scripts the page is still waiting for.
 					addEventListener('load', () => setTimeout(fetchInter, 3000));
 				}
+
+				// A refreshed page goes back to where it was left before its first frame is drawn.
+				// The browser does that itself, except WebKit while a response is still streaming.
+				// (Where it was left is recorded, and the reasoning kept, in src/lib/stable/scroll.ts.)
+				try {
+					const left = JSON.parse(sessionStorage.getItem('left-at'));
+					sessionStorage.removeItem('left-at');
+					if (entry?.type === 'reload' && left?.[0] === location.href && left[1] > 0) {
+						const put = () => {
+							if (scrollY) return; // The browser got there first, or the visitor did.
+							if (root.scrollHeight - innerHeight >= left[1]) scrollTo(0, left[1]);
+							else if (document.readyState === 'loading') requestAnimationFrame(put);
+						};
+						requestAnimationFrame(put);
+					}
+				} catch {}
 			})();
 		</script>
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />

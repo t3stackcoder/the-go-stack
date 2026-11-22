@@ -1,53 +1,56 @@
 <!--
-	Question: what does a form bound to plain state keep of what a visitor entered before the page
-	had hydrated?
-
-	The twin of /stress/superforms/early-input, with the same fields bound to a `$state` object and
-	no library between them. Each field starts from a value the server rendered, so one that
-	hydration set back is plain to see. Under the form the page prints what the state holds.
+	One field of every kind, each taking what the server holds as its default and none bound to
+	state. Under the form the page prints what the server was sent, as the action received it.
 -->
 <script lang="ts">
-	const values = $state({
-		text: 'server',
-		count: 3,
-		notes: 'server',
-		agree: false,
-		size: 'medium',
-		extras: ['card'],
-		colour: 'green',
-		days: ['tue']
-	});
+	import { saveForm } from '#lib/forms/save-form.svelte.js';
+	import Textarea from '#lib/forms/Textarea.svelte';
+	import type { PageProps } from './$types';
+
+	let { data, form }: PageProps = $props();
+
+	// It edits what the server holds, so a save leaves the fields as they are.
+	const save = saveForm({ answer: () => form, after: 'keep' });
+
+	// Where each field starts: what was typed and refused, or failing that what the server holds.
+	const start = $derived(save.answer?.values ?? data.held);
 
 	const field = 'mt-1.5 w-full rounded-lg border border-line-strong bg-surface px-3';
 </script>
 
 <svelte:head>
-	<title>Stress: bound state, input given before hydration</title>
+	<title>Stress: every kind of field, entered before hydration</title>
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-6 pt-10 pb-12">
 	<h1 class="font-display text-3xl font-semibold tracking-tight">
-		Bound state: input given before hydration
+		Every kind of field: {data.refuses ? 'refused' : 'saved'}
 	</h1>
 
-	<form method="POST" class="mt-6 grid max-w-3xl gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+	<!-- The query is repeated: without JavaScript the answer lands on the action's address. -->
+	<form
+		method="POST"
+		action="?/save{data.refuses ? '&as=refused' : ''}"
+		{@attach save.attach}
+		class="mt-6 grid max-w-3xl gap-x-6 gap-y-4 text-sm sm:grid-cols-2"
+	>
 		<label>
 			Text
-			<input name="text" bind:value={values.text} class={[field, 'h-10']} />
+			<input name="text" defaultValue={start.text} class={[field, 'h-10']} />
 		</label>
 
 		<label>
 			Number
-			<input name="count" type="number" bind:value={values.count} class={[field, 'h-10']} />
+			<input name="count" type="number" defaultValue={start.count} class={[field, 'h-10']} />
 		</label>
 
 		<label class="sm:col-span-2">
 			Text area
-			<textarea name="notes" rows="2" bind:value={values.notes} class={[field, 'py-2']}></textarea>
+			<Textarea name="notes" rows={2} defaultValue={start.notes} class={[field, 'py-2']} />
 		</label>
 
 		<label class="flex items-center gap-2">
-			<input name="agree" type="checkbox" bind:checked={values.agree} class="size-4" />
+			<input name="agree" type="checkbox" defaultChecked={start.agree} class="size-4" />
 			Checkbox
 		</label>
 
@@ -55,7 +58,13 @@
 			<legend class="sr-only">Radio group</legend>
 			{#each ['small', 'medium', 'large'] as const as size (size)}
 				<label class="flex items-center gap-2">
-					<input name="size" type="radio" value={size} bind:group={values.size} class="size-4" />
+					<input
+						name="size"
+						type="radio"
+						value={size}
+						defaultChecked={start.size === size}
+						class="size-4"
+					/>
 					{size}
 				</label>
 			{/each}
@@ -69,7 +78,7 @@
 						name="extras"
 						type="checkbox"
 						value={extra}
-						bind:group={values.extras}
+						defaultChecked={start.extras.includes(extra)}
 						class="size-4"
 					/>
 					{extra}
@@ -79,7 +88,7 @@
 
 		<label>
 			Select
-			<select name="colour" bind:value={values.colour} class={[field, 'h-10']}>
+			<select name="colour" defaultValue={start.colour} class={[field, 'h-10']}>
 				<option value="red">red</option>
 				<option value="green">green</option>
 				<option value="blue">blue</option>
@@ -88,21 +97,48 @@
 
 		<label>
 			Select, multiple
-			<select name="days" multiple size="3" bind:value={values.days} class={[field, 'py-1']}>
+			<select name="days" multiple size="3" defaultValue={start.days} class={[field, 'py-1']}>
 				<option value="mon">mon</option>
 				<option value="tue">tue</option>
 				<option value="wed">wed</option>
 			</select>
 		</label>
+
+		<div class="flex items-center gap-4 sm:col-span-2">
+			<button
+				data-busy={save.busy}
+				aria-disabled={save.busy}
+				class="h-10 rounded-lg bg-accent px-4 font-semibold text-accent-ink aria-disabled:cursor-progress"
+			>
+				Save
+			</button>
+			<p
+				data-status
+				data-state={save.status}
+				role="status"
+				class={['h-5 truncate', save.failed && 'text-bad']}
+			>
+				{save.message}
+			</p>
+		</div>
+
+		<!--
+			What the server said about each field it turned down. One line for them all: the fields
+			are the subject here, and their messages only have to be on the page.
+		-->
+		<p data-errors class="h-5 truncate text-bad sm:col-span-2">
+			{Object.entries(save.answer?.errors ?? {})
+				.map(([field, reason]) => `${field}: ${reason}`)
+				.join(' ')}
+		</p>
 	</form>
 
-	<h2 class="mt-8 text-sm font-medium">What the state holds</h2>
-	<!-- One line, clipped: the text changes with every edit, and the space it takes must not. -->
-	<pre
-		data-store
-		class="mt-2 h-10 truncate rounded-lg border border-line p-2 text-sm">{JSON.stringify(
-			values
-		)}</pre>
+	<h2 class="mt-8 text-sm font-medium">What the server was sent</h2>
+	<!-- One line, clipped: the text changes with every save, and the space it takes must not. -->
+	<pre data-sent class="mt-2 h-10 truncate rounded-lg border border-line p-2 text-sm">{save.answer
+			?.saved
+			? JSON.stringify(save.answer.saved)
+			: ''}</pre>
 
 	<p class="mt-6 text-sm text-ink-muted">This sentence must not move.</p>
 </div>

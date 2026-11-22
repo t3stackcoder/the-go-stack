@@ -16,7 +16,7 @@ export interface Item {
 	packed: boolean;
 }
 
-/** How a submission reached the server: through `use:enhance`, or as a plain HTML form post. */
+/** How a submission reached the server: sent in place by script, or as a plain HTML form post. */
 export type Via = 'enhanced' | 'plain';
 
 export interface Submission {
@@ -29,20 +29,6 @@ export interface Submission {
 	subject: string;
 }
 
-export interface AddValues {
-	text: string;
-	quantity: string;
-}
-
-export type AddErrors = Partial<Record<keyof AddValues, string>>;
-
-/** What a form action can send back to the page: the shapes passed to `fail()`. */
-export interface PackingForm {
-	values?: AddValues;
-	errors?: AddErrors;
-	refused?: { id: number; message: string };
-}
-
 /** Every new list starts with these, so the page is never empty and every visitor sees the same. */
 export const SEED: readonly Item[] = [
 	{ id: 1, text: 'Passport', quantity: 1, packed: true },
@@ -52,26 +38,19 @@ export const SEED: readonly Item[] = [
 	{ id: 5, text: 'Kitchen sink', quantity: 1, packed: false }
 ];
 
-/** Echoed values are clipped, so an oversized post is not sent straight back into the page. */
-const ECHO_LIMIT = 200;
-
 const tidy = (text: string) => text.trim().replace(/\s+/g, ' ');
 const sameText = (a: string, b: string) => tidy(a).toLowerCase() === tidy(b).toLowerCase();
 
 export type ParsedItem =
 	| { ok: true; text: string; quantity: number }
-	| { ok: false; values: AddValues; errors: AddErrors };
+	| { ok: false; errors: { text?: string; quantity?: string } };
 
-/** Validates a submitted new item against the list it would join. */
-export function parseNewItem(form: FormData, items: readonly Item[]): ParsedItem {
-	const rawText = form.get('text');
-	const rawQuantity = form.get('quantity');
-	const values: AddValues = {
-		text: (typeof rawText === 'string' ? rawText : '').slice(0, ECHO_LIMIT),
-		quantity: (typeof rawQuantity === 'string' ? rawQuantity : '').slice(0, ECHO_LIMIT)
-	};
-
-	const errors: AddErrors = {};
+/** Checks a new item, as it was typed, against the list it would join. */
+export function parseNewItem(
+	values: { text: string; quantity: string },
+	items: readonly Item[]
+): ParsedItem {
+	const errors: { text?: string; quantity?: string } = {};
 	const text = tidy(values.text);
 	const quantity = Number(values.quantity.trim());
 
@@ -89,7 +68,7 @@ export function parseNewItem(form: FormData, items: readonly Item[]): ParsedItem
 		errors.quantity = `A whole number, 1 to ${MAX_QUANTITY}.`;
 	}
 
-	if (errors.text || errors.quantity) return { ok: false, values, errors };
+	if (errors.text || errors.quantity) return { ok: false, errors };
 	return { ok: true, text, quantity };
 }
 

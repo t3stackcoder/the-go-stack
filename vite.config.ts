@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, normalizePath } from 'vite';
+import { defineConfig, normalizePath, type Plugin } from 'vite';
 import adapter from '@sveltejs/adapter-node';
 import { enhancedImages } from '@sveltejs/enhanced-img';
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -40,9 +40,56 @@ const SOURCE = `${normalizePath(resolve('src'))}/`;
 /** Svelte and SvelteKit: the packages every page needs. */
 const FRAMEWORK = /[\\/]node_modules[\\/](svelte|@sveltejs)[\\/]/;
 
+/**
+ * SvelteKit's payload module. It is an entry of the browser's build and has to keep a file of its
+ * own: the app's first file sets the payload, and only then loads the code that reads it.
+ */
+const PAYLOAD = /[\\/]@sveltejs[\\/]kit[\\/]src[\\/]runtime[\\/]client[\\/]payload\.js$/;
+
 /** The package a file under node_modules belongs to, such as `zod`. */
 const packageOf = (id: string) =>
 	/.*[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/.exec(id)?.[1].replace(/[\\/]/, '-') ?? null;
+
+/**
+ * Stops the build if the payload module has lost its file to a shared one.
+ *
+ * That is what the file-splitting rules below once did to it. A group takes the files its rule
+ * names and whatever they import, the framework's files import the payload, and so it was moved
+ * into the framework's file. The app's first file then ran the whole framework before the payload
+ * had been set, and the browser's copy of the build version was `undefined`. The first answer
+ * from the server looked like a new deployment, and from then on SvelteKit turned any navigation
+ * that ended in an error status into a full page load: a refused form lost its message and
+ * everything typed into it. Nothing failed where anyone would look, which is why the build does.
+ */
+function payloadKeepsItsFile(): Plugin {
+	return {
+		name: 'payload-keeps-its-file',
+		applyToEnvironment: (environment) => environment.name === 'client',
+		generateBundle(_, bundle) {
+			const entry = Object.values(bundle).find(
+				(file) => file.type === 'chunk' && file.isEntry && PAYLOAD.test(file.facadeModuleId ?? '')
+			);
+			if (entry?.type !== 'chunk') {
+				this.error(
+					"SvelteKit's payload module is no longer an entry of the browser's build, so " +
+						'vite.config.ts cannot check that it kept a file of its own. Find where it went.'
+				);
+			}
+			// The payload, the whole payload, and nothing but the payload. Anything else in the
+			// file, or loaded by it, is code that runs before the payload has been set.
+			const modules = Object.keys(entry.modules);
+			const alone = modules.length === 1 && PAYLOAD.test(modules[0]) && entry.imports.length === 0;
+			if (!alone) {
+				this.error(
+					`${entry.fileName} is not SvelteKit's payload module alone. It holds ` +
+						`[${modules.join(', ')}] and imports [${entry.imports.join(', ')}]. Moved into ` +
+						'a shared file, or sharing its own, the payload is read before it is set. The ' +
+						'file-splitting rules in vite.config.ts must leave that module a file to itself.'
+				);
+			}
+		}
+	};
+}
 
 export default defineConfig({
 	// How the browser's JavaScript is cut into files. Left alone, the bundler gives every distinct
@@ -55,12 +102,20 @@ export default defineConfig({
 	// others. This site's own source that three or more pages use goes into another. The rest is
 	// cut as before: a page's own code is in the page's file, and code that exactly two pages
 	// share, such as a code sample printed on both, keeps a small file to itself. So do SvelteKit's
-	// entry files and the bundler's helpers. A page now asks for 11 to 15 files.
+	// entry files and the bundler's helpers. A page now asks for 13 to 16 files.
+	//
+	// A fourth rule, listed first, gathers nothing. It keeps one module out of the other three:
+	// SvelteKit's payload, which the framework's files import and which would otherwise follow
+	// them into their file. What that broke is told above `payloadKeepsItsFile`, which fails the
+	// build if it happens again. Leaving the payload out of the other rules' tests is not enough
+	// without it, because a group also takes whatever its files import. It costs one more file a
+	// page, about 140 bytes on the wire.
 	//
 	// The second rule was once part of the first, which took in every package. That held while
-	// Svelte and SvelteKit were the only ones. Then four pages under /stress used Superforms, it
-	// went into the file every page fetches, and each page of the site was 8.6 KB heavier on the
-	// wire for a library it never ran. In a file of its own it is 9.5 KB, sent to those four.
+	// Svelte and SvelteKit were the only ones. Then a form library was tried on four pages, since
+	// removed. It went into the file every page fetches, and each page of the site was 8.6 KB
+	// heavier on the wire for a library it never ran. In a file of its own it was 9.5 KB, sent to
+	// those four. The rule stays for the next package a few pages share.
 	//
 	// Measured on 2026-11-21, loading the two builds alternately in Chromium. Over HTTP/1.1, where
 	// a browser fetches six files at a time, pages were interactive 50 to 70 ms sooner at a 20 ms
@@ -83,8 +138,17 @@ export default defineConfig({
 					output: {
 						codeSplitting: {
 							groups: [
-								{ name: 'framework', test: FRAMEWORK, minShareCount: 2 },
-								{ name: packageOf, test: /node_modules/, minShareCount: 2 },
+								{ name: 'payload', test: PAYLOAD, priority: 10 },
+								{
+									name: 'framework',
+									test: (id) => FRAMEWORK.test(id) && !PAYLOAD.test(id),
+									minShareCount: 2
+								},
+								{
+									name: packageOf,
+									test: (id) => /node_modules/.test(id) && !PAYLOAD.test(id),
+									minShareCount: 2
+								},
 								{
 									name: 'shared',
 									test: (id) => normalizePath(id).startsWith(SOURCE),
@@ -98,6 +162,7 @@ export default defineConfig({
 		}
 	},
 	plugins: [
+		payloadKeepsItsFile(),
 		highlight(),
 		tailwindcss(),
 		// Turns `?enhanced` image imports into AVIF, WebP and fallback files with known dimensions.

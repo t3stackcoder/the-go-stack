@@ -9,6 +9,8 @@
 	import { startMetrics } from '#lib/hud/metrics.svelte.js';
 	import { chapters } from '#lib/site/chapters.js';
 	import { markHydrated } from '#lib/stable/hydration.svelte.js';
+	import { WAIT_FLAG } from '#lib/stable/late.js';
+	import { restoreScrollOnReload } from '#lib/stable/scroll.js';
 	import ThemeSwitch from '#lib/theme/ThemeSwitch.svelte';
 	import type { LayoutProps } from './$types';
 
@@ -18,6 +20,7 @@
 		markHydrated();
 		startMetrics();
 		settleEarlyRejections();
+		restoreScrollOnReload();
 	});
 
 	// Cross-fade between pages instead of a hard cut. Shallow navigations change no content, and
@@ -30,6 +33,13 @@
 		// Verdict page). That is an update to the page in front of you, not a new page to fade to.
 		if (navigation.from?.route.id === navigation.to?.route.id) return;
 
+		// Not from a page that fits in the window. In the test build of Safari's engine, on
+		// Windows, a cross-fade away from a page that does not scroll crashed the tab: 3 runs of
+		// 3, for every such page, and never with the cross-fade skipped. Real Safari has not been
+		// tried. If it shows any other trouble, the cross-fade goes altogether.
+		const root = document.documentElement;
+		if (root.scrollHeight <= root.clientHeight) return;
+
 		return new Promise((resolve) => {
 			document.startViewTransition(async () => {
 				resolve();
@@ -40,7 +50,30 @@
 
 	const isCurrent = (path: string) =>
 		page.url.pathname === path || page.url.pathname.startsWith(`${path}/`);
+
+	// This page at the address that asks the server to wait for its slow data: its own, with the
+	// flag added to whatever query it has.
+	const whole = () =>
+		`${page.url.pathname}${page.url.search ? `${page.url.search}&` : '?'}${WAIT_FLAG}=1`;
 </script>
+
+<!--
+	A page that streams has late values still to come, and it takes JavaScript to put them on the
+	page. A browser without it is sent on to the same address with a flag added, and for that
+	address the server waits and sends the page whole (see src/lib/server/streaming.ts). With
+	JavaScript the tag does nothing.
+
+	A browser acts on the tag only once the response it came in has ended, which for a streamed
+	page is when the last value has settled. Measured in three browsers: a page whose slowest
+	value takes 3 s was whole after 6 s, the streamed response and then the one that waits. So the
+	first such page costs a visitor without JavaScript both, and the time limit `streaming` is
+	given bounds each of them.
+-->
+<svelte:head>
+	{#if page.data.streams}
+		<noscript><meta http-equiv="refresh" content="0; url={whole()}" /></noscript>
+	{/if}
+</svelte:head>
 
 <!--
 	The first thing a keyboard reaches: a way past the navigation that every page repeats. It is out

@@ -10,7 +10,13 @@ declare global {
 			reference?: string;
 		}
 		// interface Locals {}
-		// interface PageData {}
+		interface PageData {
+			/**
+			 * Set by `streaming` (src/lib/server/streaming.ts): whether the page has late values
+			 * still to come, which a visitor without JavaScript would never see arrive.
+			 */
+			streams?: boolean;
+		}
 		// interface PageState {}
 		// interface Platform {}
 	}

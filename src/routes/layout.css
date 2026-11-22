@@ -195,6 +195,11 @@
 		grid-template: minmax(0, 1fr) / minmax(0, 1fr);
 	}
 
+	/* One cell, whatever is in the box: a note laid over a placeholder shares it, and adds no row. */
+	.reserve > * {
+		grid-area: 1 / 1;
+	}
+
 	/* Arriving content fades in. Opacity only: it is composited, and cannot move anything. */
 	.reserve-content {
 		display: grid;

@@ -3,6 +3,10 @@
 //
 // The promise below rejects after 20 ms. The load function is still busy for another 100 ms, so
 // nothing is listening to the promise when it fails.
+//
+// This is the one page that streams without `streaming` (src/lib/server/streaming.ts), and on
+// purpose: that helper attaches the `catch` whose absence is the question. So the page has no
+// time limit either, and without JavaScript its box shows the placeholder for good.
 import type { PageServerLoad } from './$types';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

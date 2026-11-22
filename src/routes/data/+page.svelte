@@ -95,7 +95,9 @@
 		</p>
 		<p>
 			This is the whole server side of the streaming demo. Four of the values are promises, and the
-			only sign of it in the page is that their panels arrive later.
+			only sign of it in the page is that their panels arrive later. They are handed over through
+			<code>streaming</code>, this site's one helper for slow data, which is what the limits below
+			are about.
 		</p>
 	</section>
 
@@ -107,14 +109,25 @@
 		<p>
 			On this site each streamed value lands in a box reserved for it, so its arrival moves nothing,
 			and a promise that rejects shows its error in the same box. A promise that might reject also
-			needs a <code>catch</code> attached on the server, as above: if it failed before the page started
-			rendering, nothing would be listening yet, and by default Node exits on an unhandled rejection.
+			needs a <code>catch</code> attached on the server: if it failed before the page started rendering,
+			nothing would be listening yet, and by default Node exits on an unhandled rejection. The helper
+			attaches one to every promise it is given.
 		</p>
-		<h3>Three limits worth knowing</h3>
+		<h3>Four limits worth knowing</h3>
 		<ul>
 			<li>
 				Streaming needs JavaScript in the browser. The late values arrive as small scripts at the
-				end of the response; without JavaScript, their placeholders stay where they are.
+				end of the response, and without JavaScript their placeholders would stay where they are. So
+				a page that streams carries one <code>&lt;noscript&gt;</code> tag, which sends a browser
+				without JavaScript to the same address with <code>?nojs=1</code> added. For that address the helper
+				waits for every promise, and the page arrives whole. It is not free: a browser follows that tag
+				only when the streamed response has ended, so such a visitor waits for the slow data twice. Turn
+				JavaScript off and open the demo to see it.
+			</li>
+			<li>
+				A promise that never settles keeps the response open for as long as the visitor stays. The
+				helper takes a time limit, five seconds in the demo, and when it passes the panel shows a
+				failure and the response ends.
 			</li>
 			<li>
 				Some hosting platforms buffer responses. SvelteKit's documentation names AWS Lambda and

@@ -24,7 +24,7 @@
 	<div class="grid gap-6 sm:grid-cols-2">
 		<section class="rounded-2xl border border-line bg-surface p-5">
 			<h2 class="text-sm font-medium text-ink-muted">Streamed from the server</h2>
-			<Streamed promise={data.stock} class="mt-2 h-10">
+			<Streamed value={data.stock} class="mt-2 h-10">
 				{#snippet children(stock: Record<number, number>)}
 					<p class="self-center text-2xl font-semibold tabular-nums">
 						{Object.values(stock).reduce((total, units) => total + units, 0)}

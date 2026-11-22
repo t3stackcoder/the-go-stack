@@ -1,22 +1,21 @@
 <!--
 	The packing list. Every control is a plain HTML form that posts to an action in
 	routes/forms/+page.server.ts, and works with no JavaScript at all. Once the page has hydrated,
-	`use:enhance` upgrades the same forms in place: there is no second version for when script runs.
+	`saveForm` upgrades the same forms in place: there is no second version for when script runs.
 
 	The two fields take what the server sends back as their defaults (`defaultValue`), not as their
 	values. Hydration then leaves alone whatever the visitor typed while the page was still loading.
 -->
 <script lang="ts">
-	import { tick } from 'svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { enhance, type SubmitFunction } from '$app/forms';
-	import { MAX_QUANTITY, MAX_TEXT, type Item, type PackingForm } from './packing.js';
+	import { saveForm } from '#lib/forms/save-form.svelte.js';
+	import type { ActionData } from '../../../routes/forms/$types';
+	import { MAX_QUANTITY, MAX_TEXT, type Item } from './packing.js';
 
-	let { items, form }: { items: Item[]; form: PackingForm | null | undefined } = $props();
+	let { items, form }: { items: Item[]; form: ActionData } = $props();
 
 	const uid = $props.id();
 	let textInput: HTMLInputElement;
-	let quantityInput: HTMLInputElement;
 
 	// What the visitor has asked for and the server has not yet answered, laid over the server's
 	// data. When the answer arrives the overlay is removed and the server's version is what remains,
@@ -29,68 +28,54 @@
 			.map((item) => ({ ...item, packed: packing.get(item.id) ?? item.packed }))
 	);
 	const packed = $derived(shown.filter((item) => item.packed).length);
-	// Hidden while that item has a request in flight, so a repeat refusal plays its animation again.
-	const refused = $derived(
-		form?.refused && !packing.has(form.refused.id) ? form.refused : undefined
-	);
 
-	let adding = $state(false);
-
-	const add: SubmitFunction = ({ cancel }) => {
-		if (adding) {
-			cancel();
-			return;
+	// The form that adds an item. It is sent once at a time, and emptied for the next item once
+	// the server has taken this one. After a refusal, focus goes to the field that was turned down.
+	const add = saveForm({
+		answer: () => (form?.action === 'add' ? form : undefined),
+		// The server logs every attempt, the ones it turns down included, so the log beside the
+		// list is out of date after a refusal as well as after a save.
+		reload: 'always',
+		// On to the next item, unless the visitor has already gone somewhere else. Without
+		// scrolling: if they have moved down the page to read, that is where they stay.
+		saved: (_form, stayed) => {
+			if (stayed) textInput.focus({ preventScroll: true });
 		}
-		adding = true;
+	});
 
-		return async ({ result, formElement, update }) => {
-			// The handling a plain post gets, apart from the reset: the server's answer lands in
-			// `form` and the page's data is reloaded. By default only a success reloads it. Here a
-			// failure does too, because the server logs every attempt, including the ones it turns down.
-			await update({ refreshAll: true, reset: false });
-			adding = false;
-			await tick();
-			// The fields are reset here, once the answer is on the page, and not by `update`, which
-			// resets before it. A reset shows each field's default, and until this answer arrived the
-			// defaults were still whatever the server last sent back: a refused entry would reappear.
-			if (result.type === 'success') formElement.reset();
-			(form?.errors?.quantity && !form.errors.text ? quantityInput : textInput).focus();
-		};
-	};
+	// The two forms on every row: the tick and the cross. Each row's forms are sent and answered
+	// on their own. A second press of a tick abandons the first, whose answer is never applied.
+	const rows = saveForm({
+		answer: () => (form?.action === 'toggle' || form?.action === 'delete' ? form : undefined),
+		again: 'replace',
+		reload: 'always',
+		sending: (fields, formElement) => {
+			const id = Number(fields.get('id'));
+			const wanted = fields.get('packed');
 
-	// The request in flight for each item. A second click supersedes the first, whose answer is
-	// then never applied. Bookkeeping only, so it is not reactive.
-	const latest: Record<number, AbortController> = {};
+			if (wanted !== null) {
+				packing.set(id, wanted === 'true');
+				return () => packing.delete(id);
+			}
 
-	const toggle: SubmitFunction = ({ formData, controller }) => {
-		const id = Number(formData.get('id'));
-		latest[id]?.abort();
-		latest[id] = controller;
-		packing.set(id, formData.get('packed') === 'true');
-
-		return async ({ update }) => {
-			await update({ refreshAll: true });
-			packing.delete(id);
-			delete latest[id];
-		};
-	};
-
-	const remove: SubmitFunction = ({ formData, formElement }) => {
-		const id = Number(formData.get('id'));
-
-		// This row and its button are about to disappear. Keep keyboard focus on the list.
-		if (formElement.contains(document.activeElement)) {
-			const row = formElement.closest('li');
-			const neighbour = row?.nextElementSibling ?? row?.previousElementSibling;
-			(neighbour?.querySelector<HTMLElement>('[data-remove]') ?? textInput).focus();
+			// This row and its button are about to disappear. Keep keyboard focus on the list.
+			if (formElement.contains(document.activeElement)) {
+				const row = formElement.closest('li');
+				const neighbour = row?.nextElementSibling ?? row?.previousElementSibling;
+				(neighbour?.querySelector<HTMLElement>('[data-remove]') ?? textInput).focus();
+			}
+			removing.add(id);
+			return () => removing.delete(id);
 		}
-		removing.add(id);
+	});
 
-		return async ({ update }) => {
-			await update({ refreshAll: true });
-			removing.delete(id);
-		};
-	};
+	// The row whose tick the server refused. Not while that row has a request in flight, so a
+	// repeat refusal plays its animation again.
+	const refused = $derived.by(() => {
+		if (!rows.failed || rows.answer?.action !== 'toggle') return undefined;
+		const id = Number(rows.answer.values.id);
+		return packing.has(id) ? undefined : id;
+	});
 </script>
 
 <section id="packing-list" aria-labelledby="{uid}-title" class="scroll-mt-28">
@@ -108,7 +93,7 @@
 	<form
 		method="POST"
 		action="?/add#packing-list"
-		use:enhance={add}
+		{@attach add.attach}
 		class="mt-6 grid grid-cols-[6rem_auto] items-start gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,1fr)_6rem_auto]"
 	>
 		<div class="col-span-2 sm:col-span-1">
@@ -117,63 +102,73 @@
 				bind:this={textInput}
 				id="{uid}-text"
 				name="text"
-				defaultValue={form?.values?.text ?? ''}
+				defaultValue={add.answer?.values.text ?? ''}
 				required
 				maxlength={MAX_TEXT}
 				autocomplete="off"
 				placeholder="Sun cream"
-				aria-invalid={form?.errors?.text ? 'true' : undefined}
+				aria-invalid={add.answer?.errors.text ? 'true' : undefined}
 				aria-describedby="{uid}-text-error"
 				class="mt-1.5 h-10 w-full rounded-lg border border-line-strong bg-surface px-3 placeholder:text-ink-subtle aria-[invalid]:border-bad"
 			/>
 			<!-- Always present and one line tall, so a message appearing here cannot move anything. -->
 			<p id="{uid}-text-error" class="mt-1 h-5 text-sm whitespace-nowrap text-bad">
-				{form?.errors?.text ?? ''}
+				{add.answer?.errors.text ?? ''}
 			</p>
 		</div>
 
 		<div>
 			<label for="{uid}-quantity" class="text-sm font-medium">How many</label>
 			<input
-				bind:this={quantityInput}
 				id="{uid}-quantity"
 				name="quantity"
 				type="number"
 				inputmode="numeric"
-				defaultValue={form?.values?.quantity ?? '1'}
+				defaultValue={add.answer?.values.quantity ?? '1'}
 				required
 				min="1"
 				max={MAX_QUANTITY}
-				aria-invalid={form?.errors?.quantity ? 'true' : undefined}
+				aria-invalid={add.answer?.errors.quantity ? 'true' : undefined}
 				aria-describedby="{uid}-quantity-error"
 				class="mt-1.5 h-10 w-full rounded-lg border border-line-strong bg-surface px-3 tabular-nums aria-[invalid]:border-bad"
 			/>
 			<p id="{uid}-quantity-error" class="mt-1 h-5 text-sm whitespace-nowrap text-bad">
-				{form?.errors?.quantity ?? ''}
+				{add.answer?.errors.quantity ?? ''}
 			</p>
 		</div>
 
 		<!-- Both labels share one grid cell, so the button is as wide as the longer one throughout. -->
 		<button
 			type="submit"
-			aria-disabled={adding}
+			aria-disabled={add.busy}
 			class="mt-6.5 grid h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink aria-disabled:cursor-progress"
 		>
-			<span class={['self-center [grid-area:1/1]', adding && 'invisible']}>Add to list</span>
+			<span class={['self-center [grid-area:1/1]', add.busy && 'invisible']}>Add to list</span>
 			<span
-				class={['flex items-center justify-center gap-2 [grid-area:1/1]', !adding && 'invisible']}
+				class={['flex items-center justify-center gap-2 [grid-area:1/1]', !add.busy && 'invisible']}
 			>
 				<!-- Spins only while visible: a hidden spinner would still be working, and moving. -->
 				<span
 					class={[
 						'size-3.5 rounded-full border-2 border-current border-t-transparent',
-						adding && 'animate-spin'
+						add.busy && 'animate-spin'
 					]}
 					aria-hidden="true"
 				></span>
 				Adding
 			</span>
 		</button>
+
+		<!--
+			What became of the form as a whole: that it is slow, that it could not be sent, that no
+			answer came. Always present, and tall enough for the longest of them on a phone.
+		-->
+		<p
+			role="status"
+			class={['col-span-full h-10 text-sm sm:h-5', add.failed ? 'text-bad' : 'text-ink-muted']}
+		>
+			{add.message}
+		</p>
 	</form>
 
 	<!--
@@ -193,13 +188,13 @@
 					<li
 						class={[
 							'flex h-12 items-center gap-1 border-b border-line bg-surface pr-1.5',
-							refused?.id === item.id && 'refused'
+							refused === item.id && 'refused'
 						]}
 					>
 						<form
 							method="POST"
 							action="?/toggle#packing-list"
-							use:enhance={toggle}
+							{@attach rows.attach}
 							class="h-full min-w-0 flex-1"
 						>
 							<input type="hidden" name="id" value={item.id} />
@@ -214,7 +209,7 @@
 										item.packed
 											? 'border-accent bg-accent text-accent-ink'
 											: 'border-line-strong bg-surface',
-										refused?.id === item.id && 'border-bad',
+										refused === item.id && 'border-bad',
 										packing.has(item.id) && 'animate-pulse'
 									]}
 									aria-hidden="true"
@@ -235,7 +230,7 @@
 							</button>
 						</form>
 
-						<form method="POST" action="?/delete#packing-list" use:enhance={remove}>
+						<form method="POST" action="?/delete#packing-list" {@attach rows.attach}>
 							<input type="hidden" name="id" value={item.id} />
 							<button
 								data-remove
@@ -251,7 +246,10 @@
 		{/if}
 	</div>
 
-	<p role="status" class="mt-3 h-10 text-sm text-bad">{refused?.message ?? ''}</p>
+	<!-- What became of the last tick or removal: the server's refusal, or a request that failed. -->
+	<p role="status" class={['mt-3 h-10 text-sm', rows.failed ? 'text-bad' : 'text-ink-muted']}>
+		{rows.message}
+	</p>
 </section>
 
 {#snippet icon(path: string)}

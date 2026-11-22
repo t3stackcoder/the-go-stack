@@ -17,7 +17,7 @@
 	<ul class="mt-6 grid grid-cols-4 gap-2 sm:grid-cols-8">
 		{#each data.values as value, index (index)}
 			<li class="rounded-lg border border-line p-2">
-				<Streamed promise={value} class="h-10">
+				<Streamed {value} class="h-10">
 					{#snippet children(settled: { index: number; delay: number })}
 						<p data-settled class="self-center text-sm tabular-nums">
 							#{settled.index} · {settled.delay} ms
@@ -31,7 +31,7 @@
 	{#if data.hung}
 		<section class="mt-6 rounded-lg border border-line p-4">
 			<h2 class="text-sm font-medium">A dependency that has stopped answering</h2>
-			<Streamed promise={data.hung} class="mt-2 h-10">
+			<Streamed value={data.hung} class="mt-2 h-10">
 				<p data-settled class="self-center text-sm">It answered.</p>
 			</Streamed>
 		</section>

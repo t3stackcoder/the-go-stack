@@ -1,10 +1,11 @@
 <!--
 	One panel of the streaming dashboard. Given a plain value, it renders it into the server's HTML.
-	Given a promise, it reserves a box that the value streams into later, or that shows the error
-	if the promise rejects.
+	Given late data, it reserves a box that the value streams into later, or that shows the error
+	if it fails. For a visitor without JavaScript the server has waited, and the box arrives full.
 -->
 <script lang="ts">
 	import ClientOnly from '#lib/stable/ClientOnly.svelte';
+	import type { Late } from '#lib/stable/late.js';
 	import Streamed from '#lib/stable/Streamed.svelte';
 	import ArrivalTime from './ArrivalTime.svelte';
 
@@ -13,9 +14,9 @@
 		label: string;
 	}
 
-	let { name, data }: { name: string; data: Figure | Promise<Figure> } = $props();
+	let { name, data }: { name: string; data: Figure | Late<Figure> } = $props();
 
-	/** A streamed error arrives as the `{ status, message }` SvelteKit serialised for it. */
+	/** A failure arrives as the `{ status, message }` the server made of it. */
 	const reason = (error: unknown) =>
 		error instanceof Object && 'message' in error ? String(error.message) : 'It did not load.';
 </script>
@@ -31,12 +32,12 @@
 	<header class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between sm:gap-x-3">
 		<h3 class="truncate text-sm font-medium">{name}</h3>
 		<span class="shrink-0 font-mono text-xs text-ink-subtle">
-			{data instanceof Promise ? 'streamed' : 'first response'}
+			{data instanceof Promise ? 'streamed' : 'late' in data ? 'waited for' : 'first response'}
 		</span>
 	</header>
 
-	{#if data instanceof Promise}
-		<Streamed promise={data} class="mt-3 h-24">
+	{#if data instanceof Promise || 'late' in data}
+		<Streamed value={data} class="mt-3 h-24">
 			{#snippet children(value: Figure)}
 				<div class="grid grid-rows-[minmax(0,1fr)_auto]">
 					{@render figure(value)}

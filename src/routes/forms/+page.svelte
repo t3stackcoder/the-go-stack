@@ -90,11 +90,14 @@
 			to keep in step with one.
 		</p>
 		<p>
-			When validation fails, the action returns <code>fail(400, …)</code> with the messages and the
-			values that were submitted. Without JavaScript, SvelteKit renders the page again with that
-			data in its <code>form</code> prop, under a 400 status. With JavaScript, the same data arrives
-			in the same prop. The action does not need to know which kind of request it is answering. This
-			one checks anyway, for the log: <code>use:enhance</code> sends an
+			The three here are written with <code>saveAction</code>, this site's helper for forms that
+			save. It reads the posted fields against a schema. Whenever the action stops short of saving,
+			by <code>refuse()</code>, by <code>error()</code> or by a fault in its own code, the helper
+			answers with SvelteKit's <code>fail()</code>, carrying the reason and everything that was
+			submitted. Without JavaScript, SvelteKit renders the page again with that data in its
+			<code>form</code> prop, under the failure's status. With JavaScript, the same data comes back
+			to the same form. The action does not need to know which kind of request it is answering. This
+			one checks anyway, for the log: a form sent by script carries an
 			<code>x-sveltekit-action</code> header that a plain form post does not.
 		</p>
 	</section>
@@ -109,8 +112,11 @@
 			<code>use:enhance</code> attaches to a <code>&lt;form&gt;</code> that already works. With no
 			arguments it does what the browser would have done, minus the reload: it sends the form, puts
 			the answer in <code>form</code>, reloads the page's data and, after a success, resets the
-			fields. The component below passes it a function, to add what a full page load cannot: a
-			pending state, an optimistic tick, and a sensible place for keyboard focus afterwards.
+			fields. This site attaches it through one helper of its own, <code>saveForm</code> in
+			<code>src/lib/forms/save-form.svelte.ts</code>, which adds what a full page load cannot: a
+			pending state, a word when the answer is slow or never comes, and an answer that always lands
+			on the form it was for. The component below adds what only it can know: an optimistic tick,
+			and a sensible place for keyboard focus afterwards.
 		</p>
 		<p>
 			The optimistic part is a small overlay: what you asked for, laid over what the server last
@@ -158,6 +164,13 @@
 				application decisions.
 			</li>
 			<li>
+				<strong>A bare <code>use:enhance</code> is a start, not a finish.</strong> Measured on this site
+				before the helper existed: a post that was never answered showed nothing at all, an action that
+				failed replaced the form with an error page, three quick saves could leave the page and the server
+				disagreeing, and every submission dropped the page's query string from the address. Each has a
+				few lines of answer. Someone has to know to write them, once, in one place.
+			</li>
+			<li>
 				<strong>Every change is a round trip.</strong> The server holds the truth, which is what makes
 				the path without JavaScript possible. An app that has to keep working offline needs a different
 				design.
@@ -174,8 +187,8 @@
 			modern application.
 		</p>
 		<p>
-			You write the server logic once. The enhancement is a few lines around a form that already
-			worked, and it can be added, changed or removed without touching the server at all.
+			You write the server logic once. The enhancement is attached to a form that already worked,
+			and it can be added, changed or removed without touching the server at all.
 		</p>
 	</section>
 </Chapter>
