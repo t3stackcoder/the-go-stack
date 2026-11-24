@@ -7,5 +7,12 @@
 		// here for the shadcn-svelte CLI, which only accepts an import alias it finds in `paths`.
 		"paths": { "#lib/*": ["./src/lib/*"] }
 	},
-	"include": ["src", "docker", "vite.config.ts", "drizzle.config.ts", "server.js"]
+	"include": [
+		"src",
+		"docker",
+		"vite.config.ts",
+		"drizzle.config.ts",
+		"server.js",
+		"scripts/seed.js"
+	]
 }

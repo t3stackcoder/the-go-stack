@@ -1,27 +1,39 @@
 /**
- * The marker: a cookie that says "this browser is signed in" and nothing else.
+ * The marker: a cookie that says "this browser is signed in", and whether the person signed in may
+ * open the admin area. Nothing else.
  *
  * The session's own cookie cannot be read by script, which is the point of it, and most of this
  * site's pages are built once and served to everybody, so the server cannot draw the header
  * differently for a visitor who is signed in. The marker is what the page reads instead. The
  * server sets it whenever it sets the session cookie and clears it whenever it clears that one
  * (src/lib/server/auth/cookies.ts), and the script in src/app.html puts what it says on <html>
- * before the first frame, as `data-signed-in`: "yes" or "no". The header's stylesheet reads it
- * there. No attribute at all means nothing has said, which is a browser without JavaScript, and
- * the header then shows a control that is right either way (src/lib/auth/AccountButton.svelte).
+ * before the first frame: `data-signed-in`, "yes" or "no", and `data-admin` for someone who may
+ * open the admin area. The header's stylesheet reads them there. No `data-signed-in` at all means
+ * nothing has said, which is a browser without JavaScript, and the header then shows a control
+ * that is right either way (src/lib/auth/AccountButton.svelte).
  *
- * It is a hint, and holds nothing secret: it is the same for everyone. Forged, it shows the
- * avatar to someone the server will still turn away. Stale, it is corrected by the first request
- * that looks the session up, and by the account menu when it finds no session.
+ * It is a hint, and holds nothing secret. Forged, it shows the avatar, or the admin button, to
+ * someone the server will still turn away: every page and action under /admin checks the role
+ * itself (src/lib/server/auth/access.ts). Stale, it is corrected by the first request that looks
+ * the session up, and by the account menu when it finds no session.
  *
- * Its name is written three times: here, in src/lib/server/auth/cookies.ts through this file,
- * and in the boot script, which can import nothing. src/lib/auth/marker.test.ts checks the third.
+ * Its name and its values are written three times: here, in src/lib/server/auth/cookies.ts
+ * through this file, and in the boot script, which can import nothing.
+ * src/lib/auth/marker.test.ts checks the third.
  */
 export const MARKER = 'signed-in';
 
-/** Whether this browser holds the marker. Only in the browser: there is no `document` elsewhere. */
-export function hasMarker(): boolean {
-	return document.cookie.split('; ').some((cookie) => cookie.startsWith(`${MARKER}=`));
+/** What the marker can say. Absent, it says nobody is signed in. */
+export const MARKED = {
+	/** Signed in. */
+	signedIn: '1',
+	/** Signed in, by someone whose role lets them open the admin area. */
+	admin: 'admin'
+} as const;
+
+/** What the marker says, or undefined if this browser has none. Only in the browser. */
+export function readMarker(): string | undefined {
+	return /(^|; )signed-in=([^;]*)/.exec(document.cookie)?.[2];
 }
 
 /**
@@ -30,7 +42,11 @@ export function hasMarker(): boolean {
  * redirect, a sign-out) it is this that brings the header up to date. The two must agree.
  */
 export function showMarker(): void {
-	document.documentElement.dataset.signedIn = hasMarker() ? 'yes' : 'no';
+	const root = document.documentElement;
+	const marker = readMarker();
+	root.dataset.signedIn = marker !== undefined ? 'yes' : 'no';
+	if (marker === MARKED.admin) root.dataset.admin = '';
+	else delete root.dataset.admin;
 }
 
 /**

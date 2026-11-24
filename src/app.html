@@ -151,12 +151,18 @@
 				// Whether this browser is signed in, by the marker cookie the server keeps beside
 				// the session's. On <html> as `data-signed-in`, "yes" or "no", where the header's
 				// stylesheet reads it: with no attribute nothing has said, which is a browser
-				// without JavaScript. A page brought back whole by Back or Forward is as it was
-				// left, and the visitor may have signed in or out since, so it is asked again
-				// whenever a page is shown. (`showMarker` in src/lib/auth/marker.ts does the same
-				// after a move within the site, and the two must agree.)
-				const showSignedIn = () =>
-					(root.dataset.signedIn = /(^|; )signed-in=/.test(document.cookie) ? 'yes' : 'no');
+				// without JavaScript. And `data-admin` beside it when the marker says the person
+				// may open the admin area, which shows the header's admin button. A page brought
+				// back whole by Back or Forward is as it was left, and the visitor may have signed
+				// in or out since, so it is asked again whenever a page is shown. (`showMarker` in
+				// src/lib/auth/marker.ts does the same after a move within the site, and the two
+				// must agree.)
+				const showSignedIn = () => {
+					const marker = /(^|; )signed-in=([^;]*)/.exec(document.cookie)?.[2];
+					root.dataset.signedIn = marker !== undefined ? 'yes' : 'no';
+					if (marker === 'admin') root.dataset.admin = '';
+					else delete root.dataset.admin;
+				};
 				showSignedIn();
 				addEventListener('pageshow', showSignedIn);
 

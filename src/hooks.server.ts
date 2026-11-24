@@ -3,6 +3,7 @@ import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { constants, createBrotliCompress, createGzip } from 'node:zlib';
 import { error } from '@sveltejs/kit';
 import type { Handle, HandleServerError } from '@sveltejs/kit/hooks';
+import { requirePermission } from '#lib/server/auth/access.js';
 import { answerAuth, findSession } from '#lib/server/auth/call.js';
 import type { Session } from '#lib/server/auth/index.js';
 import { recordFault, recordRefusal } from '#lib/server/faults.js';
@@ -78,6 +79,9 @@ function compress(request: Request, response: Response): Response {
  */
 const AUTH = /^\/api\/auth(\/|$)/;
 
+/** The routes of the admin area, by their id. */
+const ADMIN = /^\/admin(\/|$)/;
+
 export const handle: Handle = async ({ event, resolve }) => {
 	// The pages under /stress push the foundation harder than the chapters do, and are not for
 	// visitors: anyone can ask one to hold a response or an action open, render twenty thousand
@@ -103,6 +107,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	} else {
 		let found: Promise<Session | null> | undefined;
 		event.locals.session = () => (found ??= findSession(event));
+
+		// Everything under /admin is for those whose role opens it: its pages, the data a page
+		// asks for when it is moved to within the site, its forms' actions, and any endpoint
+		// that is added there later. Checked here, before any of their own code runs, so that a
+		// page added under /admin is closed without having to remember to be. What a page or an
+		// action needs beyond getting in, it checks itself (src/lib/server/auth/access.ts).
+		if (ADMIN.test(event.route.id ?? '')) await requirePermission(event, { adminArea: ['open'] });
+
 		response = await resolve(event);
 	}
 

@@ -95,6 +95,8 @@ export const FORM_CODES: Readonly<Record<string, string>> = {
 	PROVIDER_NOT_FOUND: 'That way of signing in is not switched on here.',
 	FAILED_TO_GET_USER_INFO: 'The provider did not say who you are. Try again.',
 	USER_EMAIL_NOT_FOUND: 'The provider did not share an email address with us.',
+	// An administrator has barred the account (Better Auth's admin plugin). Any sign-in can meet it.
+	BANNED_USER: 'This account has been suspended.',
 
 	// From a provider's answer, in the address the visitor comes back to.
 	access_denied: 'Signing in was cancelled.',
@@ -143,6 +145,30 @@ export const GENERIC_CODES: ReadonlySet<string> = new Set([
 	'BODY_MUST_BE_AN_OBJECT',
 	'INVALID_OAUTH_CONFIGURATION',
 	'TOKEN_URL_NOT_FOUND',
+
+	// The admin plugin's endpoints, which no form here asks yet. Each page that does will want
+	// sentences of its own for the ones it can meet.
+	'YOU_CANNOT_BAN_YOURSELF',
+	'YOU_ARE_NOT_ALLOWED_TO_CHANGE_USERS_ROLE',
+	'YOU_ARE_NOT_ALLOWED_TO_CREATE_USERS',
+	'YOU_ARE_NOT_ALLOWED_TO_LIST_USERS',
+	'YOU_ARE_NOT_ALLOWED_TO_LIST_USERS_SESSIONS',
+	'YOU_ARE_NOT_ALLOWED_TO_BAN_USERS',
+	'YOU_ARE_NOT_ALLOWED_TO_IMPERSONATE_USERS',
+	'YOU_ARE_NOT_ALLOWED_TO_REVOKE_USERS_SESSIONS',
+	'YOU_ARE_NOT_ALLOWED_TO_DELETE_USERS',
+	'YOU_ARE_NOT_ALLOWED_TO_SET_USERS_PASSWORD',
+	'YOU_ARE_NOT_ALLOWED_TO_GET_USER',
+	'NO_DATA_TO_UPDATE',
+	'YOU_ARE_NOT_ALLOWED_TO_UPDATE_USERS',
+	'YOU_CANNOT_REMOVE_YOURSELF',
+	'YOU_ARE_NOT_ALLOWED_TO_SET_NON_EXISTENT_VALUE',
+	'YOU_CANNOT_IMPERSONATE_ADMINS',
+	'INVALID_ROLE_TYPE',
+	'YOU_ARE_NOT_ALLOWED_TO_SET_USERS_EMAIL',
+	'YOU_ARE_NOT_ALLOWED_TO_SET_USERS_PHONE_NUMBER',
+	'PASSWORD_CANNOT_BE_UPDATED_VIA_UPDATE_USER',
+	'USER_ID_CANNOT_BE_UPDATED',
 
 	// A provider's answer that could not be matched to a sign-in, or that broke on the way.
 	'no_code',
@@ -211,7 +237,10 @@ export const SAID = {
 	othersEnded: 'Every other session is signed out.',
 	sessionsNewer: 'Something signed in since this page loaded. Reload to see it.',
 	thisSession: 'That is this browser. Use Sign out to end it.',
-	deleteAsked: 'A link was sent to your address. Open it to delete the account.'
+	deleteAsked: 'A link was sent to your address. Open it to delete the account.',
+
+	// A page or form that the visitor's role does not allow (src/lib/server/auth/access.ts).
+	notAllowed: 'Your account is not allowed to do that.'
 } as const;
 
 /**

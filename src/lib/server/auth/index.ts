@@ -10,15 +10,18 @@
  *
  * What is switched on is the core: email and password with a verified address, the three
  * providers with account linking, a change of address or password, a list of sessions, and
- * deleting the account. Two-factor, passkeys, magic links, organisations and administration are
- * not: they are plugins to add when they are wanted.
+ * deleting the account. And administration: every account has a role, and the roles and what
+ * each may do are in ./access.ts. Two-factor, passkeys, magic links and organisations are not:
+ * they are plugins to add when they are wanted.
  */
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { admin } from 'better-auth/plugins/admin';
 import { PROVIDERS } from '#lib/auth/providers.js';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
+import { ac, DEFAULT_ROLE, roles } from './access.js';
 import { CLIENT_ADDRESS_HEADER } from './address.js';
 import {
 	alreadyRegistered,
@@ -145,22 +148,29 @@ export const auth = betterAuth({
 	// The first five answer with tokens: the session's own, every session's, or a provider's.
 	// A session's token is kept in a cookie that script cannot read, so that a script which
 	// should not be on the page cannot carry it off; an address that gives it to any script
-	// that asks would undo that. The last deletes the account on a GET, by a link: the email
+	// that asks would undo that. The sixth deletes the account on a GET, by a link: the email
 	// leads to a page of this site instead, with a button on it (see `deleteUser` above).
+	//
+	// The last two are the admin plugin's, and let an administrator act as somebody else. Nobody
+	// asked for that, and it is the one power of an administrator's that makes their account
+	// worth more to steal than the rest put together. Its other endpoints (listing people,
+	// setting a role, barring an account) stay on, for the pages under /admin that will use them.
 	disabledPaths: [
 		'/get-session',
 		'/list-sessions',
 		'/get-access-token',
 		'/refresh-token',
 		'/account-info',
-		'/delete-user/callback'
+		'/delete-user/callback',
+		'/admin/impersonate-user',
+		'/admin/stop-impersonating'
 	],
 
 	// Where a provider's answer that cannot be matched to a sign-in is sent. The ones that can
 	// go back to the page the sign-in was started from, which says so itself.
 	onAPIError: { errorURL: '/sign-in' },
 
-	plugins: [...mockProviders]
+	plugins: [admin({ ac, roles, defaultRole: DEFAULT_ROLE }), ...mockProviders]
 });
 
 export type Session = typeof auth.$Infer.Session;

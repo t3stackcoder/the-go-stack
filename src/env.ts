@@ -104,6 +104,18 @@ export const variables = defineEnvVars({
 			return url.origin;
 		}
 	},
+	SERVICE_COUNT: {
+		description:
+			'How many services compose.yaml defines. The health page under /admin draws that many rows while it waits for Docker to list them, and says so when Docker lists a different number. Left out, it draws none. Update it when a service is added or removed.',
+		schema: (value): number | undefined => {
+			if (value === undefined || value === '') return undefined;
+			const count = Number(value);
+			if (!Number.isInteger(count) || count < 1 || count > 50) {
+				throw new Error(`SERVICE_COUNT must be a whole number from 1 to 50, and is "${value}".`);
+			}
+			return count;
+		}
+	},
 	GOOGLE_CLIENT_ID: {
 		description: 'The client id Google gave this site, for "Continue with Google".',
 		schema: optional

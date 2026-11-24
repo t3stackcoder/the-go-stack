@@ -3,6 +3,7 @@
 // and that every sentence fits the line reserved for it.
 
 import { betterAuth } from 'better-auth';
+import { admin } from 'better-auth/plugins/admin';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { describe, expect, it } from 'vitest';
 import {
@@ -23,14 +24,14 @@ import {
 
 /**
  * Every code the installed Better Auth can answer with, read from an instance set up as the
- * site's is where codes are concerned: the core's, and the generic OAuth plugin's. It is never
- * asked anything, so it needs no database.
+ * site's is where codes are concerned: the core's, the generic OAuth plugin's and the admin
+ * plugin's. It is never asked anything, so it needs no database.
  */
 const apiCodes = Object.keys(
 	betterAuth({
 		secret: crypto.randomUUID() + crypto.randomUUID(),
 		baseURL: 'http://localhost',
-		plugins: [genericOAuth({ config: [] })]
+		plugins: [genericOAuth({ config: [] }), admin()]
 	}).$ERROR_CODES
 );
 

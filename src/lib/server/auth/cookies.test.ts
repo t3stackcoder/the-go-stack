@@ -4,8 +4,8 @@
 
 import type { Cookies } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
-import { MARKER } from '#lib/auth/marker.js';
-import { keepCookies, settleCookies } from './cookies.js';
+import { MARKED, MARKER } from '#lib/auth/marker.js';
+import { keepCookies, markerFor, sessionSetIn, settleCookies } from './cookies.js';
 
 const SESSION = 'better-auth.session_token';
 
@@ -65,6 +65,16 @@ describe('the marker', () => {
 		expect(markerIn(settleCookies([lookalike], SESSION, false))).toBeUndefined();
 	});
 
+	it('says what it is given to say', () => {
+		const marker = markerIn(settleCookies([set], SESSION, false, MARKED.admin));
+		expect(marker).toBe(`${MARKER}=admin; Path=/; Max-Age=604800; SameSite=Lax`);
+	});
+
+	it('is cleared whatever it was given to say', () => {
+		const marker = markerIn(settleCookies([cleared], SESSION, false, MARKED.admin));
+		expect(marker).toBe(`${MARKER}=; Path=/; Max-Age=0; SameSite=Lax`);
+	});
+
 	it('stands straight after the cookie it follows, and the rest keep their order', () => {
 		const settled = settleCookies([other, set, cleared], SESSION, false);
 		expect(settled.map((line) => line.split('=', 1)[0])).toEqual([
@@ -74,6 +84,30 @@ describe('the marker', () => {
 			SESSION,
 			MARKER
 		]);
+	});
+});
+
+describe('what the marker says', () => {
+	it('opens the admin button for a role that may open the admin area, and for no other', () => {
+		expect(markerFor({ role: 'admin' })).toBe(MARKED.admin);
+		expect(markerFor({ role: 'poweruser' })).toBe(MARKED.signedIn);
+		expect(markerFor({ role: 'user' })).toBe(MARKED.signedIn);
+		// No role recorded: an account from before roles, which is a user.
+		expect(markerFor({ role: null })).toBe(MARKED.signedIn);
+		expect(markerFor({ role: 'user,admin' })).toBe(MARKED.admin);
+	});
+});
+
+describe('the session cookie being set', () => {
+	it('is found, as a Cookie header would carry it, to look up whose session it is', () => {
+		expect(sessionSetIn([other, set], SESSION)).toBe(`${SESSION}=abc.def`);
+	});
+
+	it('is not found where the session cookie is cleared, or not touched', () => {
+		expect(sessionSetIn([cleared], SESSION)).toBeUndefined();
+		expect(sessionSetIn([`${SESSION}=; Path=/; HttpOnly`], SESSION)).toBeUndefined();
+		expect(sessionSetIn([other], SESSION)).toBeUndefined();
+		expect(sessionSetIn([`${SESSION}_old=abc; Max-Age=10; Path=/`], SESSION)).toBeUndefined();
 	});
 });
 

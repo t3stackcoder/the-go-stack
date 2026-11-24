@@ -2,6 +2,7 @@
 	import './layout.css';
 	import { onMount } from 'svelte';
 	import AccountButton from '#lib/auth/AccountButton.svelte';
+	import AdminButton from '#lib/auth/AdminButton.svelte';
 	import { showMarker } from '#lib/auth/marker.js';
 	import { settleEarlyRejections } from '#lib/browser-errors.js';
 	import { keepTyped, putBackTyped } from '#lib/forms/typed.js';
@@ -146,9 +147,14 @@
 					widest of the three engines where the window keeps no room for a scrollbar, which
 					is every phone (Inter needs 396px there). Chromium on a desktop keeps 15px for
 					one and needs 418px. So the name shows from 420px, and under that a 320px phone
-					does not scroll sideways.
+					does not scroll sideways. An administrator's header has the admin button too,
+					2.125rem + 2px and a gap of 0.5rem more (44px), so for them the name shows from
+					464px, the same margin over the 457px it then needs. That figure is the sum, and
+					has not been measured as the first one was.
 				-->
-					<span class="max-[26.25rem]:sr-only">Team Collaborator</span>
+					<span class="max-[26.25rem]:sr-only [:root[data-admin]_&]:max-[29rem]:sr-only"
+						>Team Collaborator</span
+					>
 				</a>
 				<!--
 				A fixed width, written out as what it holds: the theme switch (5.625rem + 2px), the
@@ -157,10 +163,17 @@
 				buttons had arrived, and the switch would then move left: the shift ThemeSwitch's own
 				fixed width is there to prevent. The account control is one size whoever is looking,
 				so the sum is the same signed in and signed out.
+
+				For an administrator it holds the admin button as well, and a third gap. Which header
+				it is is settled by the boot script before the first frame, as the button itself is
+				(src/lib/auth/AdminButton.svelte), so the wider width is never seen arriving either.
 			-->
-				<div class="flex w-[calc(10.875rem+6px)] shrink-0 items-center gap-2">
+				<div
+					class="flex w-[calc(10.875rem+6px)] shrink-0 items-center gap-2 [:root[data-admin]_&]:w-[calc(13.5rem+8px)]"
+				>
 					<ThemeSwitch />
 					<AccentPicker />
+					<AdminButton />
 					<AccountButton />
 				</div>
 			</div>

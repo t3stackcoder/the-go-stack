@@ -22,7 +22,8 @@
 		"test:watch": "vitest",
 		"auth:schema": "auth generate --config src/lib/server/auth/index.ts --output src/lib/server/db/auth-schema.ts --yes && biome check --write src/lib/server/db/auth-schema.ts",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate"
+		"db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate",
+		"db:seed": "node --env-file-if-exists=.env scripts/seed.js"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.8",

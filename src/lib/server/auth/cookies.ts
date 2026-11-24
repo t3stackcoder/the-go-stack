@@ -6,6 +6,7 @@
  * The marker rule. Whenever the session cookie is set, the marker is set beside it, and whenever
  * the session cookie is cleared, the marker is cleared: the same lifetime, the same `SameSite`
  * and the same `Secure`, but readable by script, which is what it is for (src/lib/auth/marker.ts).
+ * What it says is the caller's to decide, from whose session it is (`markerFor`).
  *
  * The Secure rule. A cookie is marked Secure exactly when the request arrived over HTTPS, as the
  * rest of the site's cookies are (see the note in src/routes/forms/+page.server.ts). Better Auth
@@ -17,7 +18,8 @@
  */
 import type { RequestEvent } from '@sveltejs/kit';
 import { parseSetCookieHeader } from 'better-auth/cookies';
-import { MARKER } from '#lib/auth/marker.js';
+import { MARKED, MARKER } from '#lib/auth/marker.js';
+import { can } from './access.js';
 
 /** The part of a Set-Cookie line before its attributes: the cookie's name and its value. */
 function pairOf(line: string): [name: string, value: string] {
@@ -36,28 +38,59 @@ function attribute(line: string, name: string): string | undefined {
 }
 
 /**
+ * Whether a Set-Cookie line clears its cookie, as a browser reads it: no value, or a lifetime
+ * that is already over.
+ */
+function clears(line: string): boolean {
+	const maxAge = attribute(line, 'max-age');
+	return pairOf(line)[1] === '' || (maxAge !== undefined && Number(maxAge.slice(8)) <= 0);
+}
+
+/**
+ * What the marker says for someone who is signed in: whether their role lets them open the admin
+ * area.
+ */
+export function markerFor(user: { role?: string | null }): string {
+	return can(user, { adminArea: ['open'] }) ? MARKED.admin : MARKED.signedIn;
+}
+
+/**
+ * The session cookie these lines set, as a Cookie header would carry it (`name=value`), so that
+ * whose session it is can be looked up. Undefined when they do not set one: they clear it, or
+ * leave it alone.
+ */
+export function sessionSetIn(lines: string[], sessionCookie: string): string | undefined {
+	const line = lines.find((each) => pairOf(each)[0] === sessionCookie && !clears(each));
+	return line?.split(';', 1)[0].trim();
+}
+
+/**
  * The Set-Cookie lines of one answer, with the two rules applied.
  *
  * @param lines What Better Auth set, one cookie a line.
  * @param sessionCookie The name of its session cookie.
  * @param secure Whether the request arrived over HTTPS.
+ * @param marker What the marker says, if these lines set the session cookie (`markerFor`).
  */
-export function settleCookies(lines: string[], sessionCookie: string, secure: boolean): string[] {
+export function settleCookies(
+	lines: string[],
+	sessionCookie: string,
+	secure: boolean,
+	marker: string = MARKED.signedIn
+): string[] {
 	const settled: string[] = [];
 
 	for (const line of lines) {
 		settled.push(secure && !attribute(line, 'secure') ? `${line}; Secure` : line);
 
-		const [name, value] = pairOf(line);
-		if (name !== sessionCookie) continue;
+		if (pairOf(line)[0] !== sessionCookie) continue;
 
 		const maxAge = attribute(line, 'max-age');
-		// Cleared is how a browser reads it: no value, or a lifetime that is already over.
-		const cleared = value === '' || (maxAge !== undefined && Number(maxAge.slice(8)) <= 0);
+		const cleared = clears(line);
 
 		settled.push(
 			[
-				`${MARKER}=${cleared ? '' : '1'}`,
+				`${MARKER}=${cleared ? '' : marker}`,
 				'Path=/',
 				// A session cookie with no lifetime lasts until the browser closes, and so does
 				// its marker.

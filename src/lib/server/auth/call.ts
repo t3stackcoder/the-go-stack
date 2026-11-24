@@ -17,7 +17,7 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { MARKER } from '#lib/auth/marker.js';
 import { setClientAddress } from './address.js';
-import { keepCookies, settleCookies } from './cookies.js';
+import { keepCookies, markerFor, sessionSetIn, settleCookies } from './cookies.js';
 import { auth, type Session, sessionCookieName } from './index.js';
 
 /** Better Auth's answer to a call, as an action needs it. */
@@ -34,11 +34,44 @@ export interface AuthAnswer {
 
 type Visit = Pick<RequestEvent, 'url' | 'request' | 'cookies' | 'getClientAddress'>;
 
-/** The Set-Cookie lines of an answer, with the marker and Secure rules applied. */
-async function cookiesOf(event: Visit, headers: Headers): Promise<string[]> {
+/**
+ * The Set-Cookie lines of an answer, with the marker and Secure rules applied.
+ *
+ * The marker says whether the person whose session is being set may open the admin area, so they
+ * have to be known. `user` is them, where the caller already knows (null for nobody). Otherwise,
+ * when the lines set a session cookie, the session is looked up by it: one query, made as someone
+ * signs in and when their session is renewed, which is once a day at most. Without it the admin
+ * button would not show after signing in until some page happened to look the session up.
+ */
+async function cookiesOf(
+	event: Visit,
+	headers: Headers,
+	user?: Session['user'] | null
+): Promise<string[]> {
 	const lines = headers.getSetCookie();
 	if (lines.length === 0) return lines;
-	return settleCookies(lines, await sessionCookieName(), event.url.protocol === 'https:');
+
+	const name = await sessionCookieName();
+	let owner = user;
+	if (owner === undefined) {
+		const cookie = sessionSetIn(lines, name);
+		owner = cookie
+			? ((
+					await auth.api.getSession({
+						headers: new Headers({ cookie }),
+						// A look, and not a use: it must not renew the session it has just been handed.
+						query: { disableRefresh: true }
+					})
+				)?.user ?? null)
+			: null;
+	}
+
+	return settleCookies(
+		lines,
+		name,
+		event.url.protocol === 'https:',
+		owner ? markerFor(owner) : undefined
+	);
 }
 
 /**
@@ -118,8 +151,9 @@ export async function answerAuth(event: RequestEvent): Promise<Response> {
  *
  * It is also where the marker is put right. Better Auth may set or clear the session cookie as
  * it looks (it renews one that is a day old, and clears one whose session is gone), and the
- * marker follows as it does everywhere. Beyond that, a session found with no marker beside it
- * gets one, for as long as the session has left, and a marker with no session behind it is
+ * marker follows as it does everywhere. Beyond that, a session found with no marker beside it,
+ * or with one that says the wrong thing (the person's role has changed since it was set), gets
+ * the right one, for as long as the session has left. A marker with no session behind it is
  * cleared: that is the browser whose cookie outlived its session, or was written by hand.
  */
 export async function findSession(event: Visit): Promise<Session | null> {
@@ -127,20 +161,24 @@ export async function findSession(event: Visit): Promise<Session | null> {
 		headers: event.request.headers,
 		returnHeaders: true
 	});
-	keepCookies(event, await cookiesOf(event, headers));
+	keepCookies(event, await cookiesOf(event, headers, session?.user ?? null));
 
-	const marked = event.cookies.get(MARKER) !== undefined;
+	// What the request came with, or what Better Auth's own answer has just put in its place.
+	const marked = event.cookies.get(MARKER);
 	const secure = event.url.protocol === 'https:';
-	if (session && !marked) {
-		const seconds = Math.floor((session.session.expiresAt.getTime() - Date.now()) / 1000);
-		event.cookies.set(MARKER, '1', {
-			path: '/',
-			maxAge: seconds,
-			httpOnly: false,
-			secure,
-			sameSite: 'lax'
-		});
-	} else if (!session && marked) {
+	if (session) {
+		const wanted = markerFor(session.user);
+		if (marked !== wanted) {
+			const seconds = Math.floor((session.session.expiresAt.getTime() - Date.now()) / 1000);
+			event.cookies.set(MARKER, wanted, {
+				path: '/',
+				maxAge: seconds,
+				httpOnly: false,
+				secure,
+				sameSite: 'lax'
+			});
+		}
+	} else if (marked !== undefined) {
 		event.cookies.delete(MARKER, { path: '/', httpOnly: false, secure, sameSite: 'lax' });
 	}
 
