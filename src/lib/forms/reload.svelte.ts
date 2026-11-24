@@ -112,9 +112,9 @@ function reloadOnce(): Promise<boolean> {
  * it is, the form is told at once that its data did not come, and the next reload starts
  * afresh. A reload that works, and every other request the page makes, passes straight through.
  *
- * What counts as failing: no answer, an answer with an error status, or one that is not the
- * JSON SvelteKit expects (a sign-in page, a proxy's own). An error raised by a `load` function
- * is none of these. It travels inside a good answer, and is SvelteKit's to show.
+ * What counts as failing: no answer, an answer with an error status, or one that is not data in
+ * a form SvelteKit sends it in (a sign-in page, a proxy's own). An error raised by a `load`
+ * function is none of these. It travels inside a good answer, and is SvelteKit's to show.
  *
  * It rests on two things SvelteKit does not promise: the address it asks for data at, and that
  * it asks through `window.fetch`. If either changes this does nothing, and a failed reload is
@@ -129,6 +129,15 @@ interface Reload {
 }
 
 const DATA = '/__data.json';
+
+/**
+ * The forms SvelteKit sends a page's data in: JSON, and for data with promises in it, a form of
+ * its own, sent a line at a time as each promise settles (src/lib/server/streaming.ts). Only JSON
+ * was taken here once. Measured on /admin/health, whose list streams: every reload after a form
+ * was taken for a failure, the form said the page had not caught up, and the list stayed as it
+ * was before the press.
+ */
+const DATA_TYPES = ['application/json', 'text/sveltekit-data'];
 
 /** The reload whose request has yet to be made. */
 let expected: Reload | undefined;
@@ -173,9 +182,8 @@ function watchFor(reload: Reload) {
 
 		try {
 			const answer = await send(input, init);
-			if (answer.ok && answer.headers.get('content-type')?.includes('application/json')) {
-				return answer;
-			}
+			const type = answer.headers.get('content-type') ?? '';
+			if (answer.ok && DATA_TYPES.some((kind) => type.includes(kind))) return answer;
 		} catch {
 			// No answer at all. Nothing here is the site's fault to record: the form says that
 			// the page is behind, and the connection is the visitor's to see to.
