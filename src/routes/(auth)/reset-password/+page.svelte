@@ -67,7 +67,7 @@
 <p class="text-sm text-ink-muted">
 	Need a new link?
 	<a
-		href={resolve('/(auth)/forgot-password')}
+		href={resolve('/(auth)/[mode=authMode]', { mode: 'forgot-password' })}
 		class="font-medium text-brand-text underline-offset-3 hover:underline"
 	>
 		Ask for one

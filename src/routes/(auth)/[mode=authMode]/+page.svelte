@@ -1,7 +1,8 @@
 <!--
-	Signing in and signing up: one page at two addresses, /sign-in and /sign-up, whose two forms
-	are panels that slide. Moving between them is a move within one route, so the page stays where
-	it is and both forms keep what was typed into them.
+	Signing in, signing up, and asking for a link to choose a new password: one page at three
+	addresses, /sign-in, /sign-up and /forgot-password, whose three forms are panels that slide.
+	They stand in a row, with signing in in the middle. Moving between them is a move within one
+	route, so the page stays where it is and every form keeps what was typed into it.
 
 	Every form here is plain HTML posting to an action in +page.server.ts, and works before the
 	page has hydrated and with no JavaScript at all: sent that way, the answer is a page load.
@@ -12,12 +13,12 @@
 
 	- The panels all lie in one grid cell. The cell is as tall as the tallest of them, at any
 	  width and in any font, with no figure written down to go stale, so the page is the same
-	  height on either address. A panel that is not showing is still laid out. It is only out of
+	  height at every address. A panel that is not showing is still laid out. It is only out of
 	  sight, and `inert`, which takes it out of the keyboard's reach and a screen reader's.
 	- Every message has a line waiting for it: one under each field, two for the form. They are
 	  written to fit (src/lib/auth/messages.ts).
-	- What follows a sign-up, "check your inbox", is a third panel in the same cell, shorter than
-	  the form whose place it takes.
+	- What follows a sign-up, "check your inbox", is one more panel in the same cell, shorter
+	  than the form whose place it takes.
 
 	The slide is `transform` and `opacity` and nothing else. Neither is layout: the browser moves
 	a picture of the panel it has already drawn, the page's own measure of layout shift stays at
@@ -39,6 +40,14 @@
 	let { data, form, params }: PageProps = $props();
 
 	const signingIn = $derived(params.mode === 'sign-in');
+	const signingUp = $derived(params.mode === 'sign-up');
+	const forgetting = $derived(params.mode === 'forgot-password');
+
+	const TITLES = {
+		'sign-in': 'Sign in',
+		'sign-up': 'Create an account',
+		'forgot-password': 'Forgot your password'
+	} as const;
 	/** The page to go back to, as every address on this page carries it: `?next=…`, or nothing. */
 	const next = $derived(data.query);
 
@@ -73,19 +82,31 @@
 		slow: 1500,
 		sending
 	});
+	// What this one says once it is sent does not depend on whether the address has an account:
+	// see the action. The address stays in its field, for the visitor to check what they typed.
+	const forgot = saveForm({
+		answer: () => (form?.action === 'forgot' ? form : undefined),
+		after: 'keep',
+		refusal: REFUSAL.sent
+	});
 
 	/**
 	 * The answer the page arrived with, if a form was sent the browser's own way. A move between
-	 * the two addresses empties `form`, and a field that nobody has typed in follows its default:
+	 * the addresses empties `form`, and a field that nobody has typed in follows its default:
 	 * without this, the address the server had sent back would vanish from its field on the way.
 	 */
 	const arrived = untrack(() => form);
 	const arrivedSignIn = arrived?.action === 'signIn' ? arrived.values : undefined;
 	const arrivedSignUp =
 		arrived?.action === 'signUp' && arrived.refused ? arrived.values : undefined;
+	const arrivedForgot =
+		arrived?.action === 'forgot' && arrived.refused ? arrived.values : undefined;
 
 	/** The sign-up's answer when it was turned down. Taken, it answers with the address instead. */
 	const signUpRefused = $derived(signUp.answer?.refused ? signUp.answer : undefined);
+	const forgotRefused = $derived(forgot.answer?.refused ? forgot.answer : undefined);
+	/** Whether a link has been asked for, and the asking was taken. */
+	const forgotAsked = $derived(forgot.answer !== undefined && !forgot.failed);
 
 	/** The address a verification link has been sent to, once a sign-up has been taken. */
 	const inbox = $derived.by(() => {
@@ -115,7 +136,7 @@
 	const signUpSaid = $derived(said(signUp));
 
 	// The keyboard goes to the first field of the form that is sliding in, and goes at once: the
-	// visitor asked for this form, and can be typing while it arrives. The move between the two
+	// visitor asked for this form, and can be typing while it arrives. The move between the
 	// addresses keeps focus where it was, on a link in the panel that has just become inert,
 	// which is nowhere: so unless focus is somewhere it can be used, it is put where they will
 	// type next.
@@ -145,7 +166,7 @@
 </script>
 
 <svelte:head>
-	<title>{signingIn ? 'Sign in' : 'Create an account'} · Team Collaborator</title>
+	<title>{TITLES[params.mode]} · Team Collaborator</title>
 </svelte:head>
 
 {#snippet providers()}
@@ -197,9 +218,54 @@
 	in the layout about what a long address did.
 -->
 <div bind:this={stage} class="stage -m-1.5 grid grid-cols-[minmax(0,1fr)] overflow-clip">
+	<!-- The panels are written in the order they stand in, left to right. -->
+	<section
+		aria-labelledby="forgot-title"
+		data-at={forgetting ? 'here' : 'left'}
+		inert={!forgetting}
+		class="panel min-w-0 p-1.5 [grid-area:1/1]"
+	>
+		<h1 id="forgot-title" class="font-display text-3xl font-semibold tracking-tight">
+			Forgot your password?
+		</h1>
+		<p class="mt-2 mb-7 text-ink-muted">
+			Enter your address and we will send a link to choose a new one.
+		</p>
+
+		<form method="POST" action="?/forgot{next ? `&${next.slice(1)}` : ''}" {@attach forgot.attach}>
+			<Field
+				name="email"
+				label="Email"
+				type="email"
+				faults={FAULTS.email}
+				autocomplete="email"
+				inputmode="email"
+				autocapitalize="none"
+				spellcheck={false}
+				required
+				defaultValue={forgotRefused?.values.email ?? arrivedForgot?.email}
+				error={forgotRefused?.errors.email}
+			/>
+			<Submit label="Send the link" working="Sending" busy={forgot.busy} class="mt-1 w-full" />
+			{@render status(forgot.message || (forgotAsked ? SAID.resetAsked : ''), forgot.failed)}
+		</form>
+
+		<p class="text-sm text-ink-muted">
+			Remembered it?
+			<a
+				href="{resolve('/(auth)/[mode=authMode]', { mode: 'sign-in' })}{next}"
+				data-sveltekit-replacestate
+				data-sveltekit-reset="false"
+				class="font-medium text-brand-text underline-offset-3 hover:underline"
+			>
+				Sign in
+			</a>
+		</p>
+	</section>
+
 	<section
 		aria-labelledby="sign-in-title"
-		data-at={signingIn ? 'here' : 'left'}
+		data-at={signingIn ? 'here' : forgetting ? 'right' : 'left'}
 		inert={!signingIn}
 		class="panel min-w-0 p-1.5 [grid-area:1/1]"
 	>
@@ -235,7 +301,9 @@
 			>
 				{#snippet aside()}
 					<a
-						href={resolve('/(auth)/forgot-password')}
+						href="{resolve('/(auth)/[mode=authMode]', { mode: 'forgot-password' })}{next}"
+						data-sveltekit-replacestate
+						data-sveltekit-reset="false"
 						class="text-sm text-brand-text underline-offset-3 hover:underline"
 					>
 						Forgot it?
@@ -261,8 +329,8 @@
 
 	<section
 		aria-labelledby="sign-up-title"
-		data-at={signingIn ? 'right' : inbox ? 'under' : 'here'}
-		inert={signingIn || inbox !== undefined}
+		data-at={!signingUp ? 'right' : inbox ? 'under' : 'here'}
+		inert={!signingUp || inbox !== undefined}
 		class="panel min-w-0 p-1.5 [grid-area:1/1]"
 	>
 		<h1 id="sign-up-title" class="font-display text-3xl font-semibold tracking-tight">
@@ -335,8 +403,8 @@
 	-->
 	<section
 		aria-labelledby="inbox-title"
-		data-at={signingIn ? 'right' : inbox ? 'here' : 'under'}
-		inert={signingIn || inbox === undefined}
+		data-at={!signingUp ? 'right' : inbox ? 'here' : 'under'}
+		inert={!signingUp || inbox === undefined}
 		class="panel min-w-0 p-1.5 [grid-area:1/1]"
 	>
 		<h1 id="inbox-title" class="font-display text-3xl font-semibold tracking-tight">
@@ -383,7 +451,8 @@
 <style>
 	/*
 	 * Where a panel is. `here` is in view. `left` and `right` are a panel's width off to that
-	 * side, where sign-in and sign-up rest when the other is showing. `under` is in place and
+	 * side, where a form rests while another is showing: the row is forgot-password, sign-in,
+	 * sign-up, and each waits on its own side of the one in view. `under` is in place and
 	 * not shown, which is how the sign-up form and the inbox take turns without either sliding.
 	 *
 	 * The curve leaves fast and lands slowly. A transition runs only on a change, so a panel is

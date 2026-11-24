@@ -6,8 +6,10 @@ import { defineParams } from '@sveltejs/kit/params';
  */
 export const params = defineParams({
 	/**
-	 * The two addresses of the page that signs a visitor in or up. They are one route, so that
-	 * moving between them keeps the page, and what has been typed into it, where it is.
+	 * The three addresses of the page that signs a visitor in or up, or sends a link to choose a
+	 * new password. They are one route, so that moving between them keeps the page, and what has
+	 * been typed into it, where it is.
 	 */
-	authMode: (param) => (param === 'sign-in' || param === 'sign-up' ? param : undefined)
+	authMode: (param) =>
+		param === 'sign-in' || param === 'sign-up' || param === 'forgot-password' ? param : undefined
 });

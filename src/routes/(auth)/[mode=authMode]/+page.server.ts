@@ -20,12 +20,19 @@ const nextOf = ({ url }: Pick<RequestEvent, 'url'>) => safeNext(url.searchParams
  */
 const afterEmail = (next: string) => `/sign-in${nextQuery(next)}`;
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, params, untrack, url }) => {
 	const next = nextOf({ url });
 
 	// Nothing to do here for a visitor who is signed in. That is also the end of a link from an
 	// email: it signs the visitor in and sends them to this page, which sends them on.
-	if (await locals.session()) redirect(303, next);
+	//
+	// Asking for a new password is the exception. A signed-in visitor may have forgotten theirs,
+	// or hold a link that has expired, and the page that says so sends them here for another.
+	//
+	// The address is read without being watched. Watched, every move between the three would
+	// ask the server for this again, and the slide would wait for the answer.
+	const forgot = untrack(() => params.mode === 'forgot-password');
+	if (!forgot && (await locals.session())) redirect(303, next);
 
 	// What the visitor arrives to be told: that a provider turned them down, or that something
 	// begun on another page is done. Both are named in the address, which anybody can write, so
@@ -52,6 +59,8 @@ const SignUp = z.object({ name: Name, email: Email, password: NewPassword });
 const Social = z.object({ provider: z.enum(PROVIDERS.map((provider) => provider.id)) });
 
 const Resend = z.object({ email: Email });
+
+const Forgot = z.object({ email: Email });
 
 export const actions = {
 	/**
@@ -116,6 +125,25 @@ export const actions = {
 		if (!answer.ok) turnDown(answer);
 
 		return { action: 'resend' as const, sent: email };
+	}),
+
+	/**
+	 * Sends a link to choose a new password, to an address that has an account. The answer is the
+	 * same when it has none, and comes as quickly (the email is not waited for: see
+	 * src/lib/server/mail.ts), so this cannot be used to find out who has an account here.
+	 *
+	 * It is also how an account that was made by signing in with a provider is given a password:
+	 * the link sets one where there was none.
+	 */
+	forgot: saveAction('forgot', Forgot, async ({ email }, event) => {
+		const answer = await callAuth(event, '/request-password-reset', {
+			email,
+			// Where the link in the email leads, with the token it was sent with.
+			redirectTo: '/reset-password'
+		});
+		if (!answer.ok) turnDown(answer, { INVALID_EMAIL: 'email' });
+
+		return { action: 'forgot' as const };
 	}),
 
 	/**
