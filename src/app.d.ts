@@ -9,7 +9,15 @@ declare global {
 			 */
 			reference?: string;
 		}
-		// interface Locals {}
+		interface Locals {
+			/**
+			 * Who is signed in, or null. Set in src/hooks.server.ts for every request but those
+			 * made while the site is being built. The session is looked up the first time this is
+			 * called and remembered for the rest of the request, so a page that does not call it
+			 * makes no query.
+			 */
+			session(): Promise<import('#lib/server/auth/index.js').Session | null>;
+		}
 		interface PageData {
 			/**
 			 * Set by `streaming` (src/lib/server/streaming.ts): whether the page has late values

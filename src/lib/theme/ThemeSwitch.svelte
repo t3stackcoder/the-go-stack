@@ -38,7 +38,7 @@
 		<button
 			type="button"
 			data-theme-set={option.value}
-			title={option.label}
+			data-tip={option.label}
 			class="option relative grid size-6.5 place-items-center rounded-full text-ink-muted hover:text-ink"
 		>
 			<svg
@@ -84,6 +84,30 @@
 	.thumb {
 		box-shadow: 0 1px 3px oklch(0 0 0 / 0.25);
 		transition: translate 300ms cubic-bezier(0.65, 0, 0.35, 1);
+	}
+
+	/*
+	 * While a change of theme fades (the boot script in app.html puts `data-theme-fade` on
+	 * <html>), the thumb is on a layer of its own, so that it is drawn sliding and not faded:
+	 * see layout.css. A layer is drawn over the page's, and the thumb's would cover the icon
+	 * that stands on it, so each option has a layer too, above the thumb's. Those fade like the
+	 * page. A name has to be the only one of its kind on the page: with a second switch the
+	 * browser would drop the fade, and the theme would change at once, as it used to.
+	 */
+	:global(:root[data-theme-fade]) .thumb {
+		view-transition-name: theme-thumb;
+	}
+
+	:global(:root[data-theme-fade]) [data-theme-set='system'] {
+		view-transition-name: theme-system;
+	}
+
+	:global(:root[data-theme-fade]) [data-theme-set='light'] {
+		view-transition-name: theme-light;
+	}
+
+	:global(:root[data-theme-fade]) [data-theme-set='dark'] {
+		view-transition-name: theme-dark;
 	}
 
 	/* The selected icon changes colour in step with the thumb arriving under it. */

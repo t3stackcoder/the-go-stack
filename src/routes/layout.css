@@ -347,6 +347,160 @@
 	}
 }
 
+/*
+ * Tooltips. One look, with an arrow, in two forms:
+ *
+ * - `.tooltip`, an element: what a field says when the browser turns it down. The field places
+ *   it and writes it (src/lib/forms/Field.svelte).
+ * - `data-tip="…"`, an attribute: a hint on a control, or the whole of some text that has been
+ *   cut short, shown under the thing when it is pointed at or reached by keyboard. It is used
+ *   where `title` would be. A `title`'s tooltip is the browser's own: it looks different in
+ *   each, cannot be styled, and never shows for a keyboard.
+ *
+ * The hint is CSS and nothing else, so it works on a page that ships no JavaScript, and costs
+ * the header, which is on every page, no script. It is not for a screen reader: whatever
+ * carries one has a name of its own already, which is what is read out.
+ *
+ * A hint is not made until it is wanted: with no `content` there is no box. A hidden box would
+ * still count towards what the page can be scrolled across, and one near the window's edge
+ * would let the page slide sideways with nothing there to see. For the same reason one at the
+ * end of a row is lined up with `data-tip-at="end"`, and stays inside the window when it shows.
+ */
+@layer components {
+	.tooltip,
+	[data-tip]::after {
+		position: absolute;
+		z-index: 10;
+		border: 1px solid var(--color-line-strong);
+		border-radius: 0.5rem;
+		background-color: var(--color-surface);
+		padding: 0.375rem 0.75rem;
+		color: var(--color-ink);
+		font-size: 0.875rem;
+		font-weight: 500;
+		line-height: 1.25rem;
+		box-shadow:
+			0 10px 24px -6px oklch(0 0 0 / 0.18),
+			0 2px 6px oklch(0 0 0 / 0.08);
+	}
+
+	/*
+	 * The arrow: a square turned on its corner, half of it behind the tooltip's top edge, with
+	 * the tooltip's background and the two sides of its border that show.
+	 */
+	.tooltip::before,
+	[data-tip]::before {
+		position: absolute;
+		width: 0.5625rem;
+		height: 0.5625rem;
+		border-top: 1px solid var(--color-line-strong);
+		border-left: 1px solid var(--color-line-strong);
+		background-color: var(--color-surface);
+		rotate: 45deg;
+	}
+
+	.tooltip::before {
+		top: -0.3125rem;
+		left: 0.875rem;
+		content: '';
+	}
+
+	/*
+	 * Each fades in as it drops the last 3px into place, so it is seen to arrive. The animation
+	 * runs when the box is made, and for a hint it is named in the rules below that make the box,
+	 * along with the pause before it. Named here for all three, it ran in Chromium and Firefox,
+	 * and WebKit showed the hint at once with no pause: measured, it starts no animation for a
+	 * pseudo-element that carried the name before it had a box.
+	 */
+	.tooltip,
+	[data-tip]::before,
+	[data-tip]::after {
+		translate: var(--tip-x, 0) 0;
+	}
+
+	.tooltip {
+		animation: tooltip-arrive 120ms ease-out backwards;
+	}
+
+	/* The hint is placed against what carries it. A utility that positions the thing still wins. */
+	[data-tip] {
+		position: relative;
+	}
+
+	/* Under the middle of the thing, 10px clear of it, as the field's is. */
+	[data-tip]::after {
+		--tip-x: -50%;
+
+		top: calc(100% + 0.625rem);
+		left: 50%;
+		width: max-content;
+		max-width: 16rem;
+		overflow-wrap: anywhere;
+		text-align: left;
+		white-space: normal;
+		pointer-events: none;
+	}
+
+	/* Above the box, so that it covers the stretch of the box's border it stands on. */
+	[data-tip]::before {
+		--tip-x: -50%;
+
+		top: calc(100% + 0.375rem);
+		left: 50%;
+		z-index: 11;
+		pointer-events: none;
+	}
+
+	/* From the thing's own edge: for text, which starts there, and for the first thing in a row. */
+	[data-tip][data-tip-at='start']::after {
+		--tip-x: 0;
+
+		left: 0;
+	}
+
+	[data-tip][data-tip-at='start']::before {
+		--tip-x: 0;
+
+		left: 0.9375rem;
+	}
+
+	/* Back from the thing's far edge, with the arrow still under its middle. */
+	[data-tip][data-tip-at='end']::after {
+		--tip-x: 0;
+
+		right: 0;
+		left: auto;
+	}
+
+	/*
+	 * Pointed at: after a pause, so that a pointer on its way past raises nothing. Only where
+	 * there is a pointer that can hover. A finger's press is taken for one, and the hint would
+	 * come up on the press and stay.
+	 */
+	@media (hover: hover) {
+		[data-tip]:hover::after {
+			content: attr(data-tip);
+			animation: tooltip-arrive 120ms ease-out 350ms backwards;
+		}
+
+		[data-tip]:hover::before {
+			content: '';
+			animation: tooltip-arrive 120ms ease-out 350ms backwards;
+		}
+	}
+
+	/* Reached by keyboard: at once. Written last, so that it is at once when pointed at as well. */
+	[data-tip]:focus-visible::after {
+		content: attr(data-tip);
+		animation: tooltip-arrive 120ms ease-out backwards;
+	}
+
+	[data-tip]:focus-visible::before {
+		content: '';
+		animation: tooltip-arrive 120ms ease-out backwards;
+	}
+}
+
 /* Running text inside a chapter. */
 @layer components {
 	.prose {
@@ -436,6 +590,13 @@
 	}
 }
 
+@keyframes tooltip-arrive {
+	from {
+		opacity: 0;
+		translate: var(--tip-x, 0) -3px;
+	}
+}
+
 @keyframes skeleton-pulse {
 	50% {
 		opacity: 0.55;
@@ -446,4 +607,31 @@
 ::view-transition-old(root),
 ::view-transition-new(root) {
 	animation-duration: 140ms;
+}
+
+/*
+ * A change of theme cross-fades too (the boot script in app.html), and takes what the theme
+ * switch's thumb takes to slide, on the thumb's curve, so the two arrive together.
+ */
+:root[data-theme-fade]::view-transition-old(*),
+:root[data-theme-fade]::view-transition-new(*) {
+	animation-duration: 300ms;
+	animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/*
+ * The thumb is not faded: it is drawn as it is, sliding. The fade is from a picture of the page
+ * as it was, and in that picture the thumb is where it started. Left in, it was seen twice: a
+ * ghost fading out where it had been, under the real one on its way. So the thumb is given a
+ * layer of its own for the fade (ThemeSwitch.svelte names it, and why its options have layers
+ * too): no picture of where it was, and the live one neither faded nor moved by the browser,
+ * which would move it a second time.
+ */
+::view-transition-old(theme-thumb) {
+	display: none;
+}
+
+::view-transition-new(theme-thumb),
+::view-transition-group(theme-thumb) {
+	animation: none;
 }

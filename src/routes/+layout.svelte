@@ -1,6 +1,8 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
+	import AccountButton from '#lib/auth/AccountButton.svelte';
+	import { showMarker } from '#lib/auth/marker.js';
 	import { settleEarlyRejections } from '#lib/browser-errors.js';
 	import { keepTyped, putBackTyped } from '#lib/forms/typed.js';
 	import Hud from '#lib/hud/Hud.svelte';
@@ -9,7 +11,7 @@
 	import { restoreScrollOnReload } from '#lib/stable/scroll.js';
 	import AccentPicker from '#lib/theme/AccentPicker.svelte';
 	import ThemeSwitch from '#lib/theme/ThemeSwitch.svelte';
-	import { onNavigate, snapshot } from '$app/navigation';
+	import { afterNavigate, onNavigate, snapshot } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import type { LayoutProps } from './$types';
@@ -32,6 +34,18 @@
 			void import('#lib/forms/reload.svelte.js').then(({ reloadData }) => reloadData());
 		}
 	});
+
+	// The header's account control goes by `data-signed-in` on <html>, which the boot script in
+	// app.html sets from the marker cookie when a page loads. A move within the site loads no
+	// page, and may be the very one that signed the visitor in, so the cookie is read again
+	// after each. The two readings must agree: see src/lib/auth/marker.ts.
+	afterNavigate(({ type }) => {
+		if (type !== 'enter') showMarker();
+	});
+
+	// The pages that sign a visitor in fill the window themselves, with no header over them
+	// (src/routes/(auth)/+layout.svelte).
+	const bare = $derived(page.route.id?.startsWith('/(auth)') ?? false);
 
 	// What a visitor has typed into a form is still there when they come back to the page, as it
 	// would be in a browser left to itself. Registered here, once, so that no page with a form
@@ -101,59 +115,72 @@
 </a>
 
 <div class="flex min-h-dvh flex-col">
-	<header class="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
-		<div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-6">
-			<a
-				href={resolve('/team-collaborator')}
-				class="flex shrink-0 items-center gap-2.5 font-display text-[0.9375rem] font-semibold tracking-tight"
-			>
-				<!-- The same mark as static/favicon.svg: two people, side by side. -->
-				<span class="grid size-7 place-items-center rounded-lg bg-brand text-brand-ink">
-					<svg
-						aria-hidden="true"
-						viewBox="0 0 24 24"
-						width="16"
-						height="16"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2.25"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<circle cx="9" cy="8" r="4" />
-						<path d="M2 21a7 7 0 0 1 14 0" />
-						<path d="M16 4.13a4 4 0 0 1 0 7.75M22 21a7 7 0 0 0-4.5-6.53" />
-					</svg>
-				</span>
-				<!--
+	{#if !bare}
+		<header class="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
+			<div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-6">
+				<a
+					href={resolve('/team-collaborator')}
+					class="flex shrink-0 items-center gap-2.5 font-display text-[0.9375rem] font-semibold tracking-tight"
+				>
+					<!-- The same mark as static/favicon.svg: two people, side by side. -->
+					<span class="grid size-7 place-items-center rounded-lg bg-brand text-brand-ink">
+						<svg
+							aria-hidden="true"
+							viewBox="0 0 24 24"
+							width="16"
+							height="16"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.25"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<circle cx="9" cy="8" r="4" />
+							<path d="M2 21a7 7 0 0 1 14 0" />
+							<path d="M16 4.13a4 4 0 0 1 0 7.75M22 21a7 7 0 0 0-4.5-6.53" />
+						</svg>
+					</span>
+					<!--
 					Out of sight, though still read out, on a window too narrow for it beside the
-					controls: 369px, measured with the fallback font in WebKit, the widest of the three
-					engines (Inter in Chromium needs 353px). Without that, a 320px phone scrolled sideways.
+					three controls. It needs 413px, measured with the fallback font in WebKit, the
+					widest of the three engines where the window keeps no room for a scrollbar, which
+					is every phone (Inter needs 396px there). Chromium on a desktop keeps 15px for
+					one and needs 418px. So the name shows from 420px, and under that a 320px phone
+					does not scroll sideways.
 				-->
-				<span class="max-[23.125rem]:sr-only">Team Collaborator</span>
-			</a>
-			<!--
-				A fixed width, written out as what it holds: the theme switch (5.625rem + 2px), a gap of
-				0.5rem and the accent button (2.125rem + 2px). Sized by its contents, it would be drawn
-				narrower if the first paint came before the button had arrived, and the switch would
-				then move left: the shift ThemeSwitch's own fixed width is there to prevent.
+					<span class="max-[26.25rem]:sr-only">Team Collaborator</span>
+				</a>
+				<!--
+				A fixed width, written out as what it holds: the theme switch (5.625rem + 2px), the
+				accent button and the account control (2.125rem + 2px each), and two gaps of 0.5rem.
+				Sized by its contents, it would be drawn narrower if the first paint came before the
+				buttons had arrived, and the switch would then move left: the shift ThemeSwitch's own
+				fixed width is there to prevent. The account control is one size whoever is looking,
+				so the sum is the same signed in and signed out.
 			-->
-			<div class="flex w-[calc(8.25rem+4px)] shrink-0 items-center gap-2">
-				<ThemeSwitch />
-				<AccentPicker />
+				<div class="flex w-[calc(10.875rem+6px)] shrink-0 items-center gap-2">
+					<ThemeSwitch />
+					<AccentPicker />
+					<AccountButton />
+				</div>
 			</div>
-		</div>
-	</header>
+		</header>
+	{/if}
 
 	<!--
 		Focusable from script only, so that following the skip link moves focus here as well as the
 		view. In development, the bottom padding keeps the last line clear of the pinned readout,
-		which is taller on a phone.
+		which is taller on a phone. The pages with no header fill the window edge to edge, and
+		keep clear of the readout themselves.
 	-->
 	<main
 		id="content"
 		tabindex="-1"
-		class={['flex-1 scroll-mt-14 outline-none', import.meta.env.DEV && 'pb-32 sm:pb-24']}
+		class={[
+			'flex-1 scroll-mt-14 outline-none',
+			import.meta.env.DEV && !bare && 'pb-32 sm:pb-24',
+			bare && 'flex flex-col'
+		]}
 	>
 		{@render children()}
 	</main>

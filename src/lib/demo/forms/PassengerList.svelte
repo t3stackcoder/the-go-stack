@@ -305,7 +305,9 @@
 									{/if}
 								</span>
 								<span class="sr-only">Aboard:</span>
-								<span class="truncate" title={party.name}>{party.name}</span>
+								<span class="min-w-0" data-tip={party.name} data-tip-at="start">
+									<span class="block truncate">{party.name}</span>
+								</span>
 								<span class="shrink-0 text-sm text-ink-subtle tabular-nums">
 									<span aria-hidden="true">×{party.seats}</span>
 									<span class="sr-only">

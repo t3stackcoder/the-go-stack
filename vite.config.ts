@@ -6,8 +6,9 @@ import adapter from '@sveltejs/adapter-node';
 import { enhancedImages } from '@sveltejs/enhanced-img';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, normalizePath, type Plugin } from 'vite';
+import { defineConfig, loadEnv, normalizePath, type Plugin } from 'vite';
 import { highlight } from './plugins/highlight.js';
+import { PROVIDERS } from './src/lib/auth/providers.js';
 
 /**
  * The one inline script in src/app.html, which has to be named in the content security policy
@@ -33,10 +34,66 @@ function bootScriptHash() {
 }
 
 /**
+ * Where a form on this site may end up, besides the site itself: the providers a visitor can
+ * sign in with. A provider's button is a form posted to this site, which answers with a redirect
+ * to the provider, and a browser may hold the redirect that follows a form to the policy's
+ * `form-action` as well as the form. Measured with a policy that did not name the origin the
+ * form was redirected to: Chromium and WebKit refused to follow, and pressing the button did
+ * nothing at all. Firefox followed it.
+ *
+ * The three real providers are always named: which of them are switched on is decided when the
+ * server starts, long after this policy is written into the build. The fake that stands in for
+ * them in development (compose.yaml) is named only while OAUTH_MOCK_URL is set, so a build made
+ * without it carries no trace of it. That also means the variable has to be as wanted when the
+ * site is built, and not only when it is run.
+ */
+function providerOrigins(mode: string): FormAction {
+	const providers: FormAction = PROVIDERS.map((provider) => provider.origin);
+	// Every variable, and not only those with Vite's prefix: this one is the server's.
+	const mock = loadEnv(mode, process.cwd(), '').OAUTH_MOCK_URL;
+	// src/env.ts is what refuses a value that is not an address on this machine. Here one that
+	// cannot be read is left out, and the server says why as it fails to start. An origin read
+	// from a URL is plain text to the type checker, where the policy's type spells a host out.
+	return mock && URL.canParse(mock)
+		? [...providers, new URL(mock).origin as FormAction[number]]
+		: providers;
+}
+
+/** What the policy's `form-action` takes, as SvelteKit types it. */
+type FormAction = NonNullable<
+	NonNullable<
+		NonNullable<NonNullable<Parameters<typeof sveltekit>[0]>['csp']>['directives']
+	>['form-action']
+>;
+
+/**
  * Where this site's own source files live, as the bundler names them. Anchored to the project,
  * because a bare `src` is also a folder inside most packages, and may be one above this project.
  */
 const SOURCE = `${normalizePath(resolve('src'))}/`;
+
+/**
+ * The part of src/lib/auth that is the header's, and so every page's: the account control and
+ * what it is built from.
+ */
+const HEADER = /\/lib\/auth\/(AccountButton\.svelte|who\.svelte\.ts|marker\.ts|next\.ts)$/;
+
+/** The fields and buttons the account pages' forms are made of. No other page has one. */
+const ACCOUNT_FORMS = [`${SOURCE}lib/forms/Field.svelte`, `${SOURCE}lib/forms/Submit.svelte`];
+
+/**
+ * Whether a file is one that only the pages about a visitor's account use: their form parts,
+ * and everything under src/lib/auth but the header's.
+ */
+function isAccounts(id: string) {
+	const file = normalizePath(id);
+	return (
+		(file.startsWith(`${SOURCE}lib/auth/`) && !HEADER.test(file)) || ACCOUNT_FORMS.includes(file)
+	);
+}
+
+/** The root layout, which is part of every page. */
+const ROOT_LAYOUT = `${SOURCE}routes/+layout.svelte`;
 
 /** Svelte and SvelteKit: the packages every page needs. */
 const FRAMEWORK = /[\\/]node_modules[\\/](svelte|@sveltejs)[\\/]/;
@@ -92,9 +149,61 @@ function payloadKeepsItsFile(): Plugin {
 	};
 }
 
-export default defineConfig({
-	// Tests sit beside the code they test, and run in Node unless a file asks for otherwise.
-	test: { include: ['src/**/*.test.ts'] },
+/**
+ * Stops the build if the account pages' file has become every page's.
+ *
+ * It is kept apart by a rule further down, which goes by where a file lives. A rule like that
+ * is one import away from being wrong: let the header use something from src/lib/auth that the
+ * rule does not know to be the header's, and the whole file follows it into every page, for
+ * pages with no form on them to download and never run. The site would work exactly as before,
+ * which is why the build is what says so.
+ */
+function accountsStayOffOtherPages(): Plugin {
+	return {
+		name: 'accounts-stay-off-other-pages',
+		applyToEnvironment: (environment) => environment.name === 'client',
+		generateBundle(_, bundle) {
+			const chunks = Object.values(bundle).filter((file) => file.type === 'chunk');
+			const accounts = chunks.find((chunk) => chunk.name === 'accounts');
+			// No such file means the account pages share nothing, and there is nothing to check.
+			if (!accounts) return;
+
+			const layout = chunks.find((chunk) => Object.keys(chunk.modules).includes(ROOT_LAYOUT));
+			if (!layout) {
+				this.error(
+					"The root layout was not found in the browser's build, so vite.config.ts cannot " +
+						"check that it does not load the account pages' file. Find where it went."
+				);
+			}
+
+			// Everything the layout's file loads as it loads, however far down.
+			const loaded = new Set<string>();
+			const follow = (fileName: string) => {
+				if (loaded.has(fileName)) return;
+				loaded.add(fileName);
+				const file = bundle[fileName];
+				if (file?.type === 'chunk') file.imports.forEach(follow);
+			};
+			follow(layout.fileName);
+
+			if (loaded.has(accounts.fileName)) {
+				this.error(
+					`The root layout loads ${accounts.fileName}, the file of code that only the account ` +
+						'pages use, so every page now downloads it. Something the header imports from ' +
+						'src/lib/auth is not named in HEADER in vite.config.ts: name it there, or move it. ' +
+						`The file holds [${Object.keys(accounts.modules)
+							.map((id) => normalizePath(id).replace(SOURCE, ''))
+							.join(', ')}].`
+				);
+			}
+		}
+	};
+}
+
+export default defineConfig(({ mode }) => ({
+	// Tests sit beside the code they test, and run in Node unless a file asks for otherwise. The
+	// services under docker/ that are this project's own code are tested the same way.
+	test: { include: ['src/**/*.test.ts', 'docker/**/*.test.ts'] },
 	// How the browser's JavaScript is cut into files. Left alone, the bundler gives every distinct
 	// set of pages that share some code a file of its own, and a page of this site asked for 21 to
 	// 28 of them, some 22 bytes long. A page is not interactive until the last has arrived.
@@ -113,6 +222,17 @@ export default defineConfig({
 	// build if it happens again. Leaving the payload out of the other rules' tests is not enough
 	// without it, because a group also takes whatever its files import. It costs one more file a
 	// page, about 140 bytes on the wire.
+	//
+	// A fifth rule keeps the third from costing every page what only a few need. The pages about
+	// a visitor's account (signing in and up, a new password, the account itself) share their
+	// fields, their buttons and their sentences, and there are more than three of them, so the
+	// third rule put all of it into the file every page fetches. Measured on 2026-11-23: that
+	// file went from 7.4 KB to 9.3 KB on the wire, and the home page was paying for a sign-in
+	// form it does not have. Now that code is a file of its own, 3.1 KB, fetched by those pages
+	// alone, and the shared file is 7.4 KB again. The rule stands after the two for packages and
+	// not ahead of them: a group takes what its files import, and listed first it took Svelte
+	// itself. The header's account control is the exception to it, being part of every page, and
+	// `accountsStayOffOtherPages` fails the build if the rest is ever pulled in after it.
 	//
 	// The second rule was once part of the first, which took in every package. That held while
 	// Svelte and SvelteKit were the only ones. Then a form library was tried on four pages, since
@@ -152,6 +272,7 @@ export default defineConfig({
 									test: (id) => /node_modules/.test(id) && !PAYLOAD.test(id),
 									minShareCount: 2
 								},
+								{ name: 'accounts', test: isAccounts, minShareCount: 2 },
 								{
 									name: 'shared',
 									test: (id) => normalizePath(id).startsWith(SOURCE),
@@ -166,6 +287,7 @@ export default defineConfig({
 	},
 	plugins: [
 		payloadKeepsItsFile(),
+		accountsStayOffOtherPages(),
 		highlight(),
 		tailwindcss(),
 		// Turns `?enhanced` image imports into AVIF, WebP and fallback files with known dimensions.
@@ -210,7 +332,7 @@ export default defineConfig({
 					'style-src-attr': ['unsafe-inline'],
 					'object-src': ['none'],
 					'base-uri': ['self'],
-					'form-action': ['self'],
+					'form-action': ['self', ...providerOrigins(mode)],
 					// Only reaches pages rendered per request. See server.js for the rest.
 					'frame-ancestors': ['none']
 				}
@@ -218,4 +340,4 @@ export default defineConfig({
 			adapter: adapter()
 		})
 	]
-});
+}));

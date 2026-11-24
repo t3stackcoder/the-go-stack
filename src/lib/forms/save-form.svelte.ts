@@ -82,7 +82,8 @@ import { answered, sentOff } from './wire.js';
  *
  * - `idle`        nothing is on its way;
  * - `sending`     sent, and not yet answered;
- * - `slow`        still not answered after half a second, which is when to say so;
+ * - `slow`        still not answered after half a second (or the form's own `slow`), which is
+ *                 when to say so;
  * - `unanswered`  given up at the time limit. It stays so until a form is sent again.
  */
 export type SaveStatus = 'idle' | 'sending' | 'slow' | 'unanswered';
@@ -117,6 +118,21 @@ export interface SaveFormOptions<Answer> {
 	/** How long to wait for an answer before giving up, in milliseconds. */
 	limit?: number;
 	/**
+	 * What a refusal is called when the server sent no sentence of its own: "Not saved.", unless
+	 * the form does something other than save, and then what it did not do, as a sentence. A
+	 * form that signs in says "Not signed in." Where fields were turned down, "See what is
+	 * marked." follows it.
+	 */
+	refusal?: string;
+	/**
+	 * How long to wait, in milliseconds, before saying that the server is slow. Half a second,
+	 * unless the form's answer is known to take that long when nothing is wrong, and then it is
+	 * said later: the server deliberately takes at least half a second over a request to send a
+	 * verification email again, so that how long it takes says nothing about the address. At
+	 * half a second that form said "slow" for a few frames before every answer.
+	 */
+	slow?: number;
+	/**
 	 * Called as a form is sent, with its fields, to show the change at once on the assumption
 	 * that the server will agree. It returns a function that takes the change back, which is
 	 * called once the answer and the reloaded data are on the page, or the send has failed. The
@@ -143,7 +159,7 @@ const UNANSWERED = 'No answer came back. It may not have been saved: send it aga
 const OFFLINE = 'There is no connection. Send it again when there is one.';
 const UNREADABLE = 'No answer could be read. It may not have been saved: send it again.';
 const REFUSED = 'Not saved.';
-const REFUSED_FIELDS = 'Not saved. See what is marked.';
+const SEE_MARKED = 'See what is marked.';
 const BEHIND = 'Saved, but this page has not caught up. Reload it to see the change.';
 
 /** The page's address without its fragment: a move within the page is not a move away from it. */
@@ -234,7 +250,14 @@ interface Sent {
 type Answered = Exclude<Awaited<ReturnType<SubmitFunction>>, void>;
 
 export function saveForm<Answer extends object>(options: SaveFormOptions<Answer>) {
-	const { again = 'ignore', after = 'reset', reload = 'saved', limit = DEFAULT_LIMIT } = options;
+	const {
+		again = 'ignore',
+		after = 'reset',
+		reload = 'saved',
+		limit = DEFAULT_LIMIT,
+		slow = SLOW_AFTER,
+		refusal = REFUSED
+	} = options;
 
 	/** How many sends are waiting for an answer, and how many of those have waited long. */
 	let flying = $state(0);
@@ -289,7 +312,7 @@ export function saveForm<Answer extends object>(options: SaveFormOptions<Answer>
 		if (problem !== undefined) return { words: problem, bad: true };
 		// A refusal always has something to say, whether or not the server sent a sentence.
 		if (refused) {
-			const fallback = Object.keys(errorsOf(answer)).length ? REFUSED_FIELDS : REFUSED;
+			const fallback = Object.keys(errorsOf(answer)).length ? `${refusal} ${SEE_MARKED}` : refusal;
 			return { words: messageOf(answer) || fallback, bad: true };
 		}
 		// Said in place of the server's own words for the save: the page beside them does not
@@ -620,7 +643,7 @@ export function saveForm<Answer extends object>(options: SaveFormOptions<Answer>
 		sent.slow = setTimeout(() => {
 			sent.lagging = true;
 			lagging += 1;
-		}, SLOW_AFTER);
+		}, slow);
 
 		if (!ahead || ahead.answered) return launch(sent);
 

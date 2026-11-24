@@ -22,6 +22,11 @@
  * A repeat is answered from memory only if the first one saved. If it was turned down, or given
  * up on, the repeat is acted on in its own right: it may be the one somebody is waiting for.
  *
+ * What is remembered is what the save returned, or where it sent the visitor, and not any cookie
+ * it set. An action that answers in cookies, a sign-in above all, would be repeated as an answer
+ * with no session behind it, so such an action is never brought here: it tells `saveAction` not
+ * to remember (`remember: false`), and is acted on every time it arrives.
+ *
  * The memory is this process's own, which is its limit. A repeat that reaches another server,
  * or this one after a restart, is not known for one, and an action still has to be safe against
  * that where it matters: by writing a state and not a change, or by a key of its own in

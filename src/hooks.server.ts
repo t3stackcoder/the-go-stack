@@ -3,6 +3,8 @@ import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { constants, createBrotliCompress, createGzip } from 'node:zlib';
 import { error } from '@sveltejs/kit';
 import type { Handle, HandleServerError } from '@sveltejs/kit/hooks';
+import { answerAuth, findSession } from '#lib/server/auth/call.js';
+import type { Session } from '#lib/server/auth/index.js';
 import { recordFault, recordRefusal } from '#lib/server/faults.js';
 import { building, dev } from '$app/env';
 import { STRESS_PAGES } from '$app/env/private';
@@ -68,6 +70,14 @@ function compress(request: Request, response: Response): Response {
 	});
 }
 
+/**
+ * Whether a request is one of Better Auth's own: the address a provider sends a visitor back
+ * to, and the links in the emails. The site has no route under this address, and its forms
+ * never post here: they go to actions, which ask Better Auth themselves
+ * (src/lib/server/auth/call.ts).
+ */
+const AUTH = /^\/api\/auth(\/|$)/;
+
 export const handle: Handle = async ({ event, resolve }) => {
 	// The pages under /stress push the foundation harder than the chapters do, and are not for
 	// visitors: anyone can ask one to hold a response or an action open, render twenty thousand
@@ -79,7 +89,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const started = performance.now();
-	const response = await resolve(event);
+
+	// While building, pages are being prerendered: nobody is signed in, there is no database to
+	// ask, and nothing is added. Otherwise Better Auth answers what is addressed to it, and
+	// every other request is given a way to ask who is signed in. Only a way: the session is
+	// looked up when a page or an action first asks, once for the request, and a page that
+	// never asks costs no query.
+	let response: Response;
+	if (building) {
+		response = await resolve(event);
+	} else if (AUTH.test(event.url.pathname)) {
+		response = await answerAuth(event);
+	} else {
+		let found: Promise<Session | null> | undefined;
+		event.locals.session = () => (found ??= findSession(event));
+		response = await resolve(event);
+	}
 
 	// How long the server took to produce the response, reported to the browser so the on-page
 	// readout can show it. For a streamed page this is the time until the page started to be

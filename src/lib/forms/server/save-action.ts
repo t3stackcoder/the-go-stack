@@ -17,8 +17,11 @@
  *         })
  *     };
  *
- * Everything typed is sent back, whatever the field. A form with a secret in it, a password,
- * needs a way to leave that field out, and this does not have one yet.
+ * Everything typed is sent back, but for the fields the action names as secret: a password, a
+ * token from a link. Those come back empty (see `secret` in `SaveOptions`). A refusal is written
+ * into the page, where it is read by anything that reads the page and kept by anything that
+ * keeps it, and a password has no business in either. The visitor types it again, which is what
+ * a browser left to itself makes of a password field too.
  *
  * A post can arrive twice for one press: a browser sends one again by itself when the connection
  * fails before any answer has come, and a visitor told that no answer came sends again what may
@@ -26,7 +29,9 @@
  * was given without saving again (see ./once.ts). That holds on one server and while it runs.
  * Where a repeat can reach another server, or this one after a restart, the action has to be
  * safe by itself: write a state and not a change ("aboard: yes", never "flip it"), or turn down
- * what is already there, as the `add` above does.
+ * what is already there, as the `add` above does. An action whose answer is more than what it
+ * returns, because it also sets a cookie, must not be answered from memory at all, and says so
+ * (see `remember` in `SaveOptions`).
  *
  * This directory is named `server`, so SvelteKit refuses to bundle it into browser code.
  */
@@ -100,6 +105,27 @@ export interface FieldLimits {
 	text?: number;
 	/** The most values one repeated field may hold. Default 1000. */
 	list?: number;
+}
+
+/** What an action may say about itself, beyond its schema. Each has a default that suits most. */
+export interface SaveOptions<Schema extends FormSchema = FormSchema> extends FieldLimits {
+	/**
+	 * The fields that hold a secret, by name. They are read and checked like any other, and
+	 * handed to `save`, and they are never sent back: in every refusal they are empty.
+	 */
+	secret?: readonly (keyof z.input<Schema> & string)[];
+	/**
+	 * Whether a repeat of a press is given the first one's answer from memory (./once.ts). It is,
+	 * unless this is `false`, and then every arrival is acted on.
+	 *
+	 * For an action whose answer travels in cookies as well as in what it returns. What is
+	 * remembered of a save is what it returned, or where it sent the visitor: not the cookies it
+	 * set. A sign-in whose first answer was lost on the way would be repeated as a redirect with
+	 * no session behind it, and the visitor's own resend carries the same key for ten minutes,
+	 * so it would be given that answer again and again. Such an action has to be safe to run
+	 * twice, since it will be.
+	 */
+	remember?: boolean;
 }
 
 class Refused extends Error {
@@ -182,7 +208,7 @@ export function saveAction<
 	name: Name,
 	schema: Schema,
 	save: (values: z.output<Schema>, event: Event) => Saved | Promise<Saved>,
-	limits: FieldLimits = {}
+	options: SaveOptions<Schema> = {}
 ): (event: Event) => Promise<Saved | ActionFailure<Refusal<Name, Schema>>> {
 	return async (event) => {
 		// A wrong name would send every refusal to a form that is not looking for it, and
@@ -219,7 +245,7 @@ export function saveAction<
 			throw unread;
 		}
 
-		const { raw, values, tooMuch } = read(fields, schema, limits);
+		const { raw, values, tooMuch } = read(fields, schema, options);
 		// The keys of `errors` are meant to be field names: they come from the schema's own
 		// complaints, from the limits, or from a call to `refuse` in the action.
 		const refusal = (status: number, errors: Record<string, string>, message?: string) =>
@@ -246,7 +272,9 @@ export function saveAction<
 				return refusal(400, errors, message);
 			}
 
-			// Once for one press, however many times the press arrives.
+			// Once for one press, however many times the press arrives, unless the action has
+			// said that its answer cannot be given from memory.
+			if (options.remember === false) return await save(checked.data, event);
 			return await saveOnce(event, fields, () => save(checked.data, event));
 		} catch (thrown) {
 			if (isRedirect(thrown)) throw thrown;
@@ -306,10 +334,16 @@ function kindOf(field: unknown): 'list' | 'checkbox' | 'text' | 'value' {
 
 /**
  * The posted fields the schema names, as the schema should be given them and as they are sent
- * back, with what was over a limit. Fields the schema does not name are dropped.
+ * back, with what was over a limit. Fields the schema does not name are dropped, and a secret
+ * field is sent back empty.
  */
-function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limits: FieldLimits) {
-	const { text: maxText = 1000, list: maxList = 1000 } = limits;
+function read<Schema extends FormSchema>(
+	fields: FormData,
+	schema: Schema,
+	options: SaveOptions<Schema>
+) {
+	const { text: maxText = 1000, list: maxList = 1000 } = options;
+	const secret = new Set<string>(options.secret);
 
 	// A browser sending a form its own way writes every line break as two characters, and a form
 	// sent by script as one. Measured: the same note in a textarea reached the action 20
@@ -317,8 +351,10 @@ function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limit
 	// action is given the same text either way, and a length limit means the same thing.
 	const posted = (value: FormDataEntryValue | null) =>
 		typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : value;
-	// A file cannot be put back into a field, so there is nothing of it to send back.
-	const typed = (value: FormDataEntryValue | null) => (typeof value === 'string' ? value : '');
+	// A file cannot be put back into a field, so there is nothing of it to send back. Nor is
+	// there of a secret, which must not be.
+	const typed = (name: string, value: FormDataEntryValue | null) =>
+		typeof value === 'string' && !secret.has(name) ? value : '';
 	const tooLong = (value: FormDataEntryValue | null) =>
 		typeof value === 'string' && value.length > maxText;
 
@@ -333,7 +369,7 @@ function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limit
 		if (kind === 'list') {
 			const all = fields.getAll(name).map(posted);
 			raw[name] = all;
-			values[name] = all.map(typed);
+			values[name] = all.map((value) => typed(name, value));
 			all.forEach((value, position) => {
 				if (tooLong(value)) tooMuch.errors[`${name}.${position}`] = long;
 			});
@@ -347,7 +383,7 @@ function read<Schema extends FormSchema>(fields: FormData, schema: Schema, limit
 			// An empty field is the empty string where text is wanted, and no value anywhere else.
 			raw[name] =
 				kind === 'text' ? (value ?? '') : value === '' || value === null ? undefined : value;
-			values[name] = typed(value);
+			values[name] = typed(name, value);
 			if (tooLong(value)) tooMuch.errors[name] = long;
 		}
 	}

@@ -24,17 +24,21 @@
 <button
 	type="button"
 	popovertarget="accent-palette"
-	title="Accent colour"
+	data-tip="Accent colour"
 	class="trigger grid size-[calc(2.125rem+2px)] shrink-0 place-items-center rounded-full border border-brand/25 bg-brand-soft text-brand-text hover:text-ink"
 >
 	<Palette size={16} strokeWidth={1.75} aria-hidden="true" />
 	<span class="sr-only">Accent colour</span>
 </button>
 
+<!--
+	`overflow-visible`: a popover scrolls what does not fit in it, and a swatch's hint hangs below
+	the last row, outside the palette.
+-->
 <div
 	id="accent-palette"
 	popover
-	class="palette rounded-xl border border-line bg-surface p-3 text-ink"
+	class="palette overflow-visible rounded-xl border border-line bg-surface p-3 text-ink"
 >
 	<p id="accent-palette-label" class="mb-2 text-xs font-medium text-ink-muted">Accent colour</p>
 	<div role="group" aria-labelledby="accent-palette-label" class="grid grid-cols-4 gap-1.5">
@@ -42,7 +46,7 @@
 			<button
 				type="button"
 				data-accent-set={accent.value}
-				title={accent.label}
+				data-tip={accent.label}
 				class="grid size-9 place-items-center rounded-full hover:bg-sunken"
 			>
 				<span

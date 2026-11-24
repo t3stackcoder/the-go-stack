@@ -7,11 +7,12 @@
 		<meta name="color-scheme" content="light dark" />
 		<!--
 			Runs before first paint, and ahead of everything SvelteKit adds to the head, so that
-			it is in the first piece of the page to arrive. It settles four things the server
-			cannot know: the theme (rationale in src/lib/theme/ThemeSwitch.svelte), the accent
-			colour (src/lib/theme/AccentPicker.svelte), the font (rationale in
-			src/routes/layout.css) and where a refreshed page was left (rationale in
-			src/lib/stable/scroll.ts).
+			it is in the first piece of the page to arrive. It settles five things the server
+			cannot know, or cannot say in a page built once for everybody: the theme (rationale
+			in src/lib/theme/ThemeSwitch.svelte), the accent colour
+			(src/lib/theme/AccentPicker.svelte), whether this browser is signed in
+			(src/lib/auth/marker.ts), the font (rationale in src/routes/layout.css) and where a
+			refreshed page was left (rationale in src/lib/stable/scroll.ts).
 		-->
 		<script>
 			(() => {
@@ -20,8 +21,9 @@
 				// A visitor's choice, kept in localStorage under `key` and shown as `data-<key>` on
 				// <html>, where the stylesheet reads it. The first value is the default: no attribute
 				// and nothing stored, so a value no longer offered falls back to it. Returns the
-				// function that makes a choice. Other open tabs are kept in step.
-				const setting = (key, [fallback, ...others]) => {
+				// function that makes a choice. Other open tabs are kept in step. `show` is how a
+				// choice the visitor has just made is put on the page: at once, unless told otherwise.
+				const setting = (key, [fallback, ...others], show = (change) => change()) => {
 					const apply = (value) => {
 						if (others.includes(value)) root.dataset[key] = value;
 						else delete root.dataset[key];
@@ -39,7 +41,7 @@
 
 					return (value) => {
 						if (value === (root.dataset[key] ?? fallback)) return;
-						apply(value);
+						show(() => apply(value));
 						try {
 							if (others.includes(value)) localStorage.setItem(key, value);
 							else localStorage.removeItem(key);
@@ -47,7 +49,36 @@
 					};
 				};
 
-				const chooseTheme = setting('theme', ['system', 'light', 'dark']);
+				// A chosen theme fades in over the old one, for as long as the switch's thumb takes
+				// to slide to it: changed in a single frame, the whole page had moved before the
+				// thumb had set off. The browser draws the fade from a picture of the page as it
+				// was, so nothing is laid out again for it. `data-theme-fade` is on <html> while it
+				// runs, and gives the fade its length (layout.css). A browser that cannot do this
+				// changes at once, as does one whose visitor has asked for less motion.
+				//
+				// So does Safari's engine, for now, as it is kept from the fade between pages (the
+				// root layout says what that did to its test build). Here the same build did not
+				// draw the thumb at all while a fade ran: measured, on the site and on a bare page
+				// with nothing else on it. Real Safari has not been tried.
+				let fading;
+				const fade = (change) => {
+					if (
+						!document.startViewTransition ||
+						matchMedia('(prefers-reduced-motion: reduce)').matches ||
+						navigator.vendor.startsWith('Apple')
+					) {
+						return change();
+					}
+					root.dataset.themeFade = '';
+					const mine = (fading = document.startViewTransition(change));
+					// A second choice cuts the first fade short, and this one is then not the last.
+					const done = () => {
+						if (fading === mine) delete root.dataset.themeFade;
+					};
+					mine.finished.then(done, done);
+				};
+
+				const chooseTheme = setting('theme', ['system', 'light', 'dark'], fade);
 				// The accents in AccentPicker.svelte, default first; src/lib/theme/accents.test.ts checks.
 				const chooseAccent = setting('accent', [
 					'orange',
@@ -60,8 +91,20 @@
 					'pink'
 				]);
 
+				// The theme option at a point, by measuring. The event's own target cannot be
+				// trusted for it, nor `elementFromPoint`: while a fade runs, Chromium and WebKit
+				// answer every point with <html> (measured), and a second press on the switch, or
+				// a slide across it, would go nowhere for the length of the fade.
+				const themeAt = ({ clientX: x, clientY: y }) =>
+					[...document.querySelectorAll('[data-theme-set]')].find((option) => {
+						const box = option.getBoundingClientRect();
+						return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
+					});
+
 				addEventListener('click', (event) => {
-					const theme = event.target.closest?.('[data-theme-set]')?.dataset.themeSet;
+					// The target first: a press from the keyboard is at no point at all.
+					const theme = (event.target.closest?.('[data-theme-set]') ?? themeAt(event))?.dataset
+						.themeSet;
 					if (theme) chooseTheme(theme);
 					const accent = event.target.closest?.('[data-accent-set]')?.dataset.accentSet;
 					if (accent) chooseAccent(accent);
@@ -70,10 +113,12 @@
 				// The switch also slides: press anywhere on it and move across it, and the theme
 				// follows the pointer from segment to segment until it is let go.
 				addEventListener('pointerdown', (event) => {
-					const group = event.target.closest?.('[data-theme-group]');
+					const group =
+						event.target.closest?.('[data-theme-group]') ??
+						themeAt(event)?.closest('[data-theme-group]');
 					if (!group) return;
-					const follow = ({ clientX, clientY }) => {
-						const option = document.elementFromPoint(clientX, clientY)?.closest('[data-theme-set]');
+					const follow = (event) => {
+						const option = themeAt(event);
 						if (option && group.contains(option)) chooseTheme(option.dataset.themeSet);
 					};
 					const stop = () => {
@@ -85,6 +130,18 @@
 					addEventListener('pointerup', stop);
 					addEventListener('pointercancel', stop);
 				});
+
+				// Whether this browser is signed in, by the marker cookie the server keeps beside
+				// the session's. On <html> as `data-signed-in`, "yes" or "no", where the header's
+				// stylesheet reads it: with no attribute nothing has said, which is a browser
+				// without JavaScript. A page brought back whole by Back or Forward is as it was
+				// left, and the visitor may have signed in or out since, so it is asked again
+				// whenever a page is shown. (`showMarker` in src/lib/auth/marker.ts does the same
+				// after a move within the site, and the two must agree.)
+				const showSignedIn = () =>
+					(root.dataset.signedIn = /(^|; )signed-in=/.test(document.cookie) ? 'yes' : 'no');
+				showSignedIn();
+				addEventListener('pageshow', showSignedIn);
 
 				// The font for this visit is settled when the first frame is drawn: Inter if it has
 				// loaded by then, the fallback from then on if it has not. The font is declared
