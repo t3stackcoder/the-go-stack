@@ -29,18 +29,31 @@
 						else delete root.dataset[key];
 					};
 
+					// What is chosen now. Remembered here, and not read back from <html> when a
+					// choice is made: one that is shown with a fade is put there a frame later, and
+					// the small movement in a press and its release arrive together. Read back, the
+					// release was taken for a second choice: two fades for one press, the first cut
+					// short and reported as an error, and the theme changed with no fade at all
+					// (seen in the log from Chrome and Edge, then measured).
+					let chosen = fallback;
+					const settle = (value) => {
+						apply(value);
+						chosen = root.dataset[key] ?? fallback;
+					};
+
 					// Storage can be unavailable (blocked cookies, some private modes). The default
 					// is then shown and the choice is not kept, which is the correct degradation.
 					try {
-						apply(localStorage.getItem(key));
+						settle(localStorage.getItem(key));
 					} catch {}
 
 					addEventListener('storage', (event) => {
-						if (event.key === key) apply(event.newValue);
+						if (event.key === key) settle(event.newValue);
 					});
 
 					return (value) => {
-						if (value === (root.dataset[key] ?? fallback)) return;
+						if (value === chosen) return;
+						chosen = value;
 						show(() => apply(value));
 						try {
 							if (others.includes(value)) localStorage.setItem(key, value);
@@ -76,6 +89,10 @@
 						if (fading === mine) delete root.dataset.themeFade;
 					};
 					mine.finished.then(done, done);
+					// A fade cut short before it has begun says so by rejecting `ready`. That is
+					// expected, and answered here: unanswered, the browser reports an error nobody
+					// caught, and the site records it.
+					mine.ready.catch(() => {});
 				};
 
 				const chooseTheme = setting('theme', ['system', 'light', 'dark'], fade);
