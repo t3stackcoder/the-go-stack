@@ -1,6 +1,14 @@
 <!--
-	The readout pinned to the bottom of every page in development (the root layout leaves it out of
-	a production build): what this page cost, measured live.
+	The readout pinned to the bottom of every page: what this page cost, measured live. It is shown
+	to someone signed in who has switched it on, on their preferences page
+	(src/routes/account/preferences), in development and in production alike.
+
+	Whether it shows is decided the way the header's admin button is, and for the same reason: most
+	pages are built once for everybody, so no script here can decide it without the readout
+	flashing in after hydration. It is in every page's HTML, hidden, and CSS shows it by
+	`data-readout` on <html>, which the boot script in app.html sets before the first frame from
+	the marker cookie (src/lib/auth/marker.ts). It measures from hydration whether it is shown or
+	not, so that switched on part way through a visit it has the whole visit's figures to show.
 
 	Everything but the values is in the server's HTML: the frame, the cells and their labels, and a
 	small loader where each value will be. The values are revealed together, a moment after
@@ -111,8 +119,12 @@
 	</div>
 {/snippet}
 
+<!--
+	`grid` when shown: a reserved box is a grid (layout.css), and `hidden` takes that away. Never
+	on paper: the rule that shows it outranks a plain `print:hidden`, so it is kept to the screen.
+-->
 <Reserve
-	class="pointer-events-none fixed inset-x-0 bottom-4 z-20 mx-auto h-22 w-[calc(100vw-1.5rem)] sm:h-12 sm:w-120 lg:right-6 lg:left-auto lg:mx-0 print:hidden"
+	class="pointer-events-none fixed inset-x-0 bottom-4 z-20 mx-auto hidden h-22 w-[calc(100vw-1.5rem)] sm:h-12 sm:w-120 lg:right-6 lg:left-auto lg:mx-0 [:root[data-readout]_&]:not-print:grid"
 >
 	<aside
 		aria-label="Live measurements of this page"

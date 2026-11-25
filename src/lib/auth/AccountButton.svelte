@@ -38,6 +38,8 @@
 	take, so the text arriving moves nothing.
 -->
 <script lang="ts">
+	import LogOut from '@lucide/svelte/icons/log-out';
+	import Settings from '@lucide/svelte/icons/settings';
 	import UserRound from '@lucide/svelte/icons/user-round';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -51,6 +53,17 @@
 
 	const control =
 		'size-[calc(2.125rem+2px)] shrink-0 place-items-center rounded-full border border-brand/25 bg-brand-soft text-brand-text hover:text-ink';
+
+	/** A line of the menu: its icon, then what it does. */
+	const item =
+		'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left font-medium hover:bg-sunken';
+	/** The menu's icons: the size and stroke of the header's own, quieter than the words. */
+	const ICON = {
+		size: 16,
+		strokeWidth: 1.75,
+		'aria-hidden': true,
+		class: 'shrink-0 text-ink-muted'
+	} as const;
 </script>
 
 <a
@@ -119,18 +132,18 @@
 		</p>
 	</div>
 	<div class="border-t border-line pt-1.5">
-		<a
-			href={resolve('/account')}
-			class="flex h-9 items-center rounded-lg px-2.5 font-medium hover:bg-sunken"
-		>
+		<a href={resolve('/account')} class={item}>
+			<UserRound {...ICON} />
 			Account
+		</a>
+		<a href={resolve('/account/preferences')} class={item}>
+			<Settings {...ICON} />
+			Preferences
 		</a>
 		<!-- A plain form, sent the browser's own way: signing out is a page load either way. -->
 		<form method="POST" action={resolve('/sign-out')}>
-			<button
-				type="submit"
-				class="flex h-9 w-full items-center rounded-lg px-2.5 text-left font-medium hover:bg-sunken"
-			>
+			<button type="submit" class={item}>
+				<LogOut {...ICON} />
 				Sign out
 			</button>
 		</form>

@@ -16,7 +16,7 @@ interface InteractionEntry extends PerformanceEntry {
 
 /**
  * One page's measurements. Created by the readout itself, and not when this module is loaded, so
- * that a production build, which never renders the readout, has none of this in it.
+ * that importing this module measures nothing.
  */
 export class PageMetrics {
 	/** Milliseconds from the start of the page load until hydration finished. */

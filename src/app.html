@@ -10,9 +10,10 @@
 			it is in the first piece of the page to arrive. It settles five things the server
 			cannot know, or cannot say in a page built once for everybody: the theme (rationale
 			in src/lib/theme/ThemeSwitch.svelte), the accent colour
-			(src/lib/theme/AccentPicker.svelte), whether this browser is signed in
-			(src/lib/auth/marker.ts), the font (rationale in src/routes/layout.css) and where a
-			refreshed page was left (rationale in src/lib/stable/scroll.ts).
+			(src/lib/theme/AccentPicker.svelte), whether this browser is signed in and what the
+			marker says of the person (src/lib/auth/marker.ts), the font (rationale in
+			src/routes/layout.css) and where a refreshed page was left (rationale in
+			src/lib/stable/scroll.ts).
 		-->
 		<script>
 			(() => {
@@ -151,17 +152,21 @@
 				// Whether this browser is signed in, by the marker cookie the server keeps beside
 				// the session's. On <html> as `data-signed-in`, "yes" or "no", where the header's
 				// stylesheet reads it: with no attribute nothing has said, which is a browser
-				// without JavaScript. And `data-admin` beside it when the marker says the person
-				// may open the admin area, which shows the header's admin button. A page brought
-				// back whole by Back or Forward is as it was left, and the visitor may have signed
-				// in or out since, so it is asked again whenever a page is shown. (`showMarker` in
-				// src/lib/auth/marker.ts does the same after a move within the site, and the two
-				// must agree.)
+				// without JavaScript. Beside it, one attribute for each flag the marker carries:
+				// `data-admin` when the person may open the admin area, which shows the header's
+				// admin button, and `data-readout` when they have switched the readout on, which
+				// shows it. A page brought back whole by Back or Forward is as it was left, and the
+				// visitor may have signed in or out since, so it is asked again whenever a page is
+				// shown. (`showMarker` in src/lib/auth/marker.ts does the same after a move within
+				// the site, and the two must agree.)
 				const showSignedIn = () => {
 					const marker = /(^|; )signed-in=([^;]*)/.exec(document.cookie)?.[2];
+					const flags = marker?.split('.') ?? [];
 					root.dataset.signedIn = marker !== undefined ? 'yes' : 'no';
-					if (marker === 'admin') root.dataset.admin = '';
+					if (flags.includes('admin')) root.dataset.admin = '';
 					else delete root.dataset.admin;
+					if (flags.includes('readout')) root.dataset.readout = '';
+					else delete root.dataset.readout;
 				};
 				showSignedIn();
 				addEventListener('pageshow', showSignedIn);

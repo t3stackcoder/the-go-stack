@@ -13,6 +13,8 @@
 		"vite.config.ts",
 		"drizzle.config.ts",
 		"server.js",
-		"scripts/seed.js"
+		"scripts/seed.js",
+		"scripts/launch.js",
+		"scripts/launch.test.ts"
 	]
 }

@@ -4,7 +4,7 @@
 
 import type { Cookies } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
-import { MARKED, MARKER } from '#lib/auth/marker.js';
+import { FLAG_SEPARATOR, MARKED, MARKER } from '#lib/auth/marker.js';
 import { keepCookies, markerFor, sessionSetIn, settleCookies } from './cookies.js';
 
 const SESSION = 'better-auth.session_token';
@@ -95,6 +95,20 @@ describe('what the marker says', () => {
 		// No role recorded: an account from before roles, which is a user.
 		expect(markerFor({ role: null })).toBe(MARKED.signedIn);
 		expect(markerFor({ role: 'user,admin' })).toBe(MARKED.admin);
+	});
+
+	it('shows the readout for someone who has switched it on, and for nobody else', () => {
+		expect(markerFor({ role: 'user', showReadout: true })).toBe(MARKED.readout);
+		expect(markerFor({ role: 'user', showReadout: false })).toBe(MARKED.signedIn);
+		// Not asked yet: an account from before the choice existed, or one made since.
+		expect(markerFor({ role: 'user', showReadout: null })).toBe(MARKED.signedIn);
+		expect(markerFor({ role: 'user' })).toBe(MARKED.signedIn);
+	});
+
+	it('says both, always in the same order, so that a marker already right is seen to be', () => {
+		expect(markerFor({ role: 'admin', showReadout: true })).toBe(
+			`${MARKED.admin}${FLAG_SEPARATOR}${MARKED.readout}`
+		);
 	});
 });
 

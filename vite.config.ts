@@ -202,8 +202,8 @@ function accountsStayOffOtherPages(): Plugin {
 
 export default defineConfig(({ mode }) => ({
 	// Tests sit beside the code they test, and run in Node unless a file asks for otherwise. The
-	// services under docker/ that are this project's own code are tested the same way.
-	test: { include: ['src/**/*.test.ts', 'docker/**/*.test.ts'] },
+	// services under docker/ and the scripts under scripts/ are tested the same way.
+	test: { include: ['src/**/*.test.ts', 'docker/**/*.test.ts', 'scripts/**/*.test.ts'] },
 	// How the browser's JavaScript is cut into files. Left alone, the bundler gives every distinct
 	// set of pages that share some code a file of its own, and a page of this site asked for 21 to
 	// 28 of them, some 22 bytes long. A page is not interactive until the last has arrived.

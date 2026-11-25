@@ -1,20 +1,24 @@
-// Whether a browser is signed in, and whether as someone who may open the admin area, is written
-// down in places that cannot share code: the cookie's name and values here, the boot script in
-// app.html that reads the cookie before anything can be imported, and the stylesheet rules in the
-// header's controls that show one control or another. A name or a value changed in one and not
-// the others leaves the header showing "sign in" to everybody, or the admin button to nobody, and
-// nothing on the page would say why.
+// Whether a browser is signed in, whether as someone who may open the admin area, and whether
+// they have switched the readout on, is written down in places that cannot share code: the
+// cookie's name and values here, the boot script in app.html that reads the cookie before
+// anything can be imported, and the stylesheet rules that show one control or another, and the
+// readout. A name or a value changed in one and not the others leaves the header showing "sign in"
+// to everybody, or the admin button or the readout to nobody, and nothing on the page would say
+// why.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MARKED, MARKER } from './marker.js';
+import { FLAG_SEPARATOR, MARKED, MARKER } from './marker.js';
 
 const root = join(import.meta.dirname, '../../..');
 const bootScript = readFileSync(join(root, 'src/app.html'), 'utf-8');
 const marker = readFileSync(join(root, 'src/lib/auth/marker.ts'), 'utf-8');
 const control = readFileSync(join(root, 'src/lib/auth/AccountButton.svelte'), 'utf-8');
 const adminButton = readFileSync(join(root, 'src/lib/auth/AdminButton.svelte'), 'utf-8');
+const hud = readFileSync(join(root, 'src/lib/hud/Hud.svelte'), 'utf-8');
+const layout = readFileSync(join(root, 'src/routes/+layout.svelte'), 'utf-8');
+const authLayout = readFileSync(join(root, 'src/routes/(auth)/+layout.svelte'), 'utf-8');
 
 describe('the signed-in marker', () => {
 	// At the start of the cookie string or after a separator: not the tail of another name.
@@ -30,10 +34,22 @@ describe('the signed-in marker', () => {
 		expect(bootScript).toContain(signedIn);
 		expect(marker).toContain(signedIn);
 
-		expect(bootScript).toContain(`if (marker === '${MARKED.admin}') root.dataset.admin = ''`);
-		expect(marker).toContain("if (marker === MARKED.admin) root.dataset.admin = ''");
-		expect(bootScript).toContain('else delete root.dataset.admin');
-		expect(marker).toContain('else delete root.dataset.admin');
+		expect(bootScript).toContain(`const flags = marker?.split('${FLAG_SEPARATOR}') ?? []`);
+		expect(marker).toContain('const flags = marker?.split(FLAG_SEPARATOR) ?? []');
+
+		for (const [flag, attribute] of [
+			['admin', 'admin'],
+			['readout', 'readout']
+		] as const) {
+			expect(bootScript).toContain(
+				`if (flags.includes('${MARKED[flag]}')) root.dataset.${attribute} = ''`
+			);
+			expect(marker).toContain(
+				`if (flags.includes(MARKED.${flag})) root.dataset.${attribute} = ''`
+			);
+			expect(bootScript).toContain(`else delete root.dataset.${attribute}`);
+			expect(marker).toContain(`else delete root.dataset.${attribute}`);
+		}
 	});
 
 	it('is asked again whenever a page is shown, for one brought back by Back or Forward', () => {
@@ -49,5 +65,13 @@ describe('the signed-in marker', () => {
 
 	it('shows the admin button only where it says the admin area is open', () => {
 		expect(adminButton).toContain(':global(:root[data-admin]) .admin');
+	});
+
+	it('shows the readout, and the room kept clear of it, only where it says it is switched on', () => {
+		expect(hud).toMatch(
+			/<Reserve\s+class="[^"]*\bhidden\b[^"]*\[:root\[data-readout\]_&\]:not-print:grid/
+		);
+		expect(layout).toContain("!bare && '[:root[data-readout]_&]:pb-32");
+		expect(authLayout).toContain('[:root[data-readout]_&]:pb-32');
 	});
 });

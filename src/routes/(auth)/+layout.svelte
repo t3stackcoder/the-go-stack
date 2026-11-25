@@ -19,9 +19,9 @@
 	box from the window down to the form is told that it may be narrower than what it holds
 	(`minmax(0, 1fr)`, `min-w-0`), and what does not fit is cut short where it stands.
 
-	In development the readout is pinned to the foot of the window (src/lib/hud/Hud.svelte), over
-	the form's column on a narrow window, so that column keeps clear of it. On a wide one the
-	readout sits over the panel, and nothing needs to move.
+	When it is switched on, the readout is pinned to the foot of the window
+	(src/lib/hud/Hud.svelte), over the form's column on a narrow window, so that column keeps clear
+	of it. On a wide one the readout sits over the panel, and nothing needs to move.
 -->
 <script lang="ts">
 	import { resolve } from '$app/paths';
@@ -50,7 +50,9 @@
 {/snippet}
 
 <div class="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-	<div class={['flex min-w-0 flex-col', import.meta.env.DEV && 'pb-32 sm:pb-24 lg:pb-0']}>
+	<div
+		class="flex min-w-0 flex-col [:root[data-readout]_&]:pb-32 [:root[data-readout]_&]:sm:pb-24 [:root[data-readout]_&]:lg:pb-0"
+	>
 		<header
 			class="flex h-14 shrink-0 items-center bg-brand px-6 text-brand-ink lg:h-20 lg:bg-transparent lg:px-10 lg:text-ink"
 		>

@@ -83,6 +83,14 @@ export const auth = betterAuth({
 	},
 
 	user: {
+		// The preferences page's choices (src/routes/account/preferences). Kept with the account,
+		// so each follows the person to every browser they sign in on. A page built once for
+		// everybody learns them before its first frame from the marker cookie, which carries
+		// them (src/lib/auth/marker.ts).
+		additionalFields: {
+			// The readout pinned to the foot of every page (src/lib/hud/Hud.svelte).
+			showReadout: { type: 'boolean', required: false, defaultValue: false, input: true }
+		},
 		changeEmail: {
 			enabled: true,
 			// The address an account has now is asked first, and the new one after it. A session

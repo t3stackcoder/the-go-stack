@@ -13,6 +13,7 @@
  */
 @source not '../lib/components/ui/*';
 @source '../lib/components/ui/card';
+@source '../lib/components/ui/switch';
 
 /*
  * `dark:` must agree with the tokens below in all three states: an explicit dark choice, an
@@ -29,6 +30,17 @@
 		}
 	}
 }
+
+/*
+ * The shadcn-svelte components style their on and off states with `data-checked:` and
+ * `data-unchecked:`, which Tailwind reads as an attribute of that name being present. The bits-ui
+ * they are built on says it with `data-state` instead ("checked" or "unchecked") and sets neither,
+ * so none of those styles applied: the switch had no track colour, a thumb the colour of the page
+ * and a thumb that never moved, and on the dark theme it could not be seen at all. Both variants
+ * are given the meaning the components need here, once, for every component that uses them.
+ */
+@custom-variant data-checked (&[data-state='checked']);
+@custom-variant data-unchecked (&[data-state='unchecked']);
 
 /*
  * Inter, self-hosted. One variable file carries both the weight axis and the optical-size axis,

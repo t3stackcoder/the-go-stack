@@ -37,11 +37,14 @@ type Visit = Pick<RequestEvent, 'url' | 'request' | 'cookies' | 'getClientAddres
 /**
  * The Set-Cookie lines of an answer, with the marker and Secure rules applied.
  *
- * The marker says whether the person whose session is being set may open the admin area, so they
- * have to be known. `user` is them, where the caller already knows (null for nobody). Otherwise,
- * when the lines set a session cookie, the session is looked up by it: one query, made as someone
- * signs in and when their session is renewed, which is once a day at most. Without it the admin
- * button would not show after signing in until some page happened to look the session up.
+ * The marker says things about the person whose session is being set (whether they may open the
+ * admin area, whether they have switched the readout on), so they have to be known. `user` is
+ * them, where the caller already knows (null for nobody). Otherwise, when the lines set a session
+ * cookie, the session is looked up by it: one query, made as someone signs in, when their session
+ * is renewed (once a day at most), and after `/update-user` (a new name, or a preference), whose
+ * answer sets the session cookie again. Without it the admin button would not show after signing
+ * in until some page happened to look the session up, and a preference would reach the marker a
+ * page late.
  */
 async function cookiesOf(
 	event: Visit,
@@ -152,9 +155,10 @@ export async function answerAuth(event: RequestEvent): Promise<Response> {
  * It is also where the marker is put right. Better Auth may set or clear the session cookie as
  * it looks (it renews one that is a day old, and clears one whose session is gone), and the
  * marker follows as it does everywhere. Beyond that, a session found with no marker beside it,
- * or with one that says the wrong thing (the person's role has changed since it was set), gets
- * the right one, for as long as the session has left. A marker with no session behind it is
- * cleared: that is the browser whose cookie outlived its session, or was written by hand.
+ * or with one that says the wrong thing (the person's role has changed since it was set, or they
+ * have switched the readout on or off in another browser), gets the right one, for as long as the
+ * session has left. A marker with no session behind it is cleared: that is the browser whose
+ * cookie outlived its session, or was written by hand.
  */
 export async function findSession(event: Visit): Promise<Session | null> {
 	const { response: session, headers } = await auth.api.getSession({

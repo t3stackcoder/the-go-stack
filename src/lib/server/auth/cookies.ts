@@ -18,7 +18,7 @@
  */
 import type { RequestEvent } from '@sveltejs/kit';
 import { parseSetCookieHeader } from 'better-auth/cookies';
-import { MARKED, MARKER } from '#lib/auth/marker.js';
+import { FLAG_SEPARATOR, MARKED, MARKER } from '#lib/auth/marker.js';
 import { can } from './access.js';
 
 /** The part of a Set-Cookie line before its attributes: the cookie's name and its value. */
@@ -48,10 +48,15 @@ function clears(line: string): boolean {
 
 /**
  * What the marker says for someone who is signed in: whether their role lets them open the admin
- * area.
+ * area, and whether they have switched the readout on. Always in the same order, so that a marker
+ * that already says the right thing is seen to (`findSession` in ./call.ts compares them).
  */
-export function markerFor(user: { role?: string | null }): string {
-	return can(user, { adminArea: ['open'] }) ? MARKED.admin : MARKED.signedIn;
+export function markerFor(user: { role?: string | null; showReadout?: boolean | null }): string {
+	const flags = [
+		can(user, { adminArea: ['open'] }) && MARKED.admin,
+		user.showReadout === true && MARKED.readout
+	].filter((flag) => flag !== false);
+	return flags.length > 0 ? flags.join(FLAG_SEPARATOR) : MARKED.signedIn;
 }
 
 /**

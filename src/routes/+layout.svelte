@@ -182,16 +182,17 @@
 
 	<!--
 		Focusable from script only, so that following the skip link moves focus here as well as the
-		view. In development, the bottom padding keeps the last line clear of the pinned readout,
-		which is taller on a phone. The pages with no header fill the window edge to edge, and
-		keep clear of the readout themselves.
+		view. While the readout is switched on, the bottom padding keeps the last line clear of it,
+		as it is taller on a phone. Gone with the readout, by the same attribute and so before the
+		first frame. The pages with no header fill the window edge to edge, and keep clear of the
+		readout themselves.
 	-->
 	<main
 		id="content"
 		tabindex="-1"
 		class={[
 			'flex-1 scroll-mt-14 outline-none',
-			import.meta.env.DEV && !bare && 'pb-32 sm:pb-24',
+			!bare && '[:root[data-readout]_&]:pb-32 [:root[data-readout]_&]:sm:pb-24',
 			bare && 'flex flex-col'
 		]}
 	>
@@ -200,11 +201,7 @@
 </div>
 
 <!--
-	The development readout, rendered with the page so it is on screen at first paint (see
-	src/lib/hud/Hud.svelte). The build replaces `import.meta.env.DEV` with `false`, and the readout
-	and its measuring are then dropped from a production build altogether. Not `dev` from
-	`$app/env`, which the bundler cannot see through: behind it, the readout stayed in the build.
+	The readout, rendered with every page so that for someone who has switched it on it is on
+	screen at first paint. For everybody else it is hidden, by CSS (see src/lib/hud/Hud.svelte).
 -->
-{#if import.meta.env.DEV}
-	<Hud />
-{/if}
+<Hud />
