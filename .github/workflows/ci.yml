@@ -39,3 +39,13 @@ jobs:
 
       - name: Tests
         run: pnpm test
+
+      # The build checks its own output (vite.config.ts): that SvelteKit's payload kept a file to
+      # itself, that the account pages' code stayed off the other pages, and that no stylesheet
+      # grew too big to be written into the page. None of those fails anywhere else. The build
+      # reads the server's variables, so it is given the ones in .env.example, and a secret of
+      # its own: the build refuses the example's, and this one signs nothing.
+      - name: Build
+        run: cp .env.example .env && pnpm build
+        env:
+          BETTER_AUTH_SECRET: only-for-the-build-in-ci-and-signs-nothing

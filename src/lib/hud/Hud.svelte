@@ -28,6 +28,12 @@
 	Five cells do not fit across a phone, so the grid has six columns there: three cells take two
 	each on the first row, and the other two share the second. From the `sm` breakpoint up, all five
 	sit in one row.
+
+	The grid has a fixed height, written out as what it holds: rows of two 1rem lines, and on a
+	phone two of them with a gap of 0.5rem. A page can be painted while its HTML is still arriving,
+	and the readout is the last thing in it. Sized by its cells, the grid was drawn one row tall
+	and, being centred in its frame, moved up 20px when the second row turned up: a layout shift of
+	0.0017, measured on a phone over a slow connection on 2026-11-25, by the readout itself.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
@@ -130,7 +136,11 @@
 		aria-label="Live measurements of this page"
 		class="pointer-events-auto flex items-center rounded-2xl border border-line bg-surface/90 px-4 shadow-lg backdrop-blur"
 	>
-		<dl aria-busy={!revealed} class="grid w-full grid-cols-6 gap-y-2 sm:grid-cols-5">
+		<!-- `content-start`: the rows keep their own height while only some of them have arrived. -->
+		<dl
+			aria-busy={!revealed}
+			class="grid h-18 w-full grid-cols-6 content-start gap-y-2 sm:h-8 sm:grid-cols-5"
+		>
 			{@render cell(
 				'JS sent',
 				metrics.scriptBytes > 0 ? `${kilobytes(metrics.scriptBytes)} KB` : PENDING

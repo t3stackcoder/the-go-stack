@@ -205,3 +205,24 @@
 	screen at first paint. For everybody else it is hidden, by CSS (see src/lib/hud/Hud.svelte).
 -->
 <Hud />
+
+<!--
+	The last thing in every page, and nothing to look at. A link in the <head> of app.html names
+	it, and the browser draws no frame until it has arrived, which is when everything above it
+	has: nothing is drawn until the page's own markup is all here, and it is held for no longer
+	than the HTML takes to arrive.
+
+	A page drawn part way through arriving is laid out as though the part were the whole, and
+	whatever is centred, or pushed to the far end of a row, moves as the rest turns up. Measured
+	on 2026-11-25 over a slow connection at a desktop width: the sign-in form, centred in the
+	window's height, moved three or four times as its fields arrived, a layout shift of 0.03 to
+	0.04 on every load. What is held back is small. The stylesheet is in the <head> and nothing
+	can be drawn before it, and what follows it is 3 to 4 KB on the wire for the home page and
+	the sign-in page.
+
+	Chromium and Safari's engine hold the frame. Firefox does not know the link and draws as the
+	HTML arrives, as every browser did before. A page that streams is not held for its late
+	values, which come after this. A page rendered only in the browser has no such element in its
+	HTML, and is drawn when the HTML ends.
+-->
+<span id="page-end" hidden></span>

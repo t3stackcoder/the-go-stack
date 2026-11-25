@@ -235,6 +235,8 @@
 				} catch {}
 			})();
 		</script>
+		<!-- Holds the first frame until the whole page has arrived. Why: src/routes/+layout.svelte. -->
+		<link rel="expect" href="#page-end" blocking="render" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
 		%sveltekit.head%
 	</head>

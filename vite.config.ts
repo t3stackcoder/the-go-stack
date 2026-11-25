@@ -200,6 +200,55 @@ function accountsStayOffOtherPages(): Plugin {
 	};
 }
 
+/**
+ * The size, in bytes, from which a stylesheet is no longer written into the page's HTML: what
+ * `inlineStyleThreshold` is given below. The site's shared stylesheet was 69 KB when this was
+ * set, so there is room to grow, and `stylesheetsStayInline` says when the room has run out.
+ */
+const INLINE_STYLES_UNDER = 100_000;
+
+/**
+ * Stops the build if a stylesheet has grown too big to be written into the page.
+ *
+ * SvelteKit writes a stylesheet into the HTML while it is under the threshold, and from then on
+ * links it without a word. That happened here. The site has one shared stylesheet, which holds
+ * every Tailwind class that any page uses. The account and admin pages took it from 42 KB to
+ * 69 KB, the threshold was 60 KB, and every page went back to a second round trip before its
+ * first paint. Measured on 2026-11-25 on /sign-in, five loads each way: first paint at 864 ms
+ * linked and 384 ms written in on a slow phone at a 150 ms round trip, and 596 against 232 on a
+ * laptop at the same distance. The site looked exactly as before, which is why the build is
+ * what says so.
+ *
+ * The test is SvelteKit's own, on the same files: the length of each stylesheet in the browser's
+ * build against the threshold.
+ */
+function stylesheetsStayInline(): Plugin {
+	return {
+		name: 'stylesheets-stay-inline',
+		applyToEnvironment: (environment) => environment.name === 'client',
+		generateBundle: {
+			// After the plugins that write and shrink the stylesheets, so that this is their final size.
+			order: 'post',
+			handler(_, bundle) {
+				for (const file of Object.values(bundle)) {
+					if (file.type !== 'asset' || !file.fileName.endsWith('.css')) continue;
+
+					const size = file.source.toString().length;
+					if (size >= INLINE_STYLES_UNDER) {
+						this.error(
+							`${file.fileName} is ${size} bytes, and a stylesheet is only written into the ` +
+								`page while it is under ${INLINE_STYLES_UNDER}. SvelteKit would link it instead, ` +
+								'and every page that uses it would wait a round trip longer for its first ' +
+								'paint. Make it smaller, or raise INLINE_STYLES_UNDER in vite.config.ts, ' +
+								'knowing that every page load then carries that much more HTML.'
+						);
+					}
+				}
+			}
+		}
+	};
+}
+
 export default defineConfig(({ mode }) => ({
 	// Tests sit beside the code they test, and run in Node unless a file asks for otherwise. The
 	// services under docker/ and the scripts under scripts/ are tested the same way.
@@ -288,6 +337,7 @@ export default defineConfig(({ mode }) => ({
 	plugins: [
 		payloadKeepsItsFile(),
 		accountsStayOffOtherPages(),
+		stylesheetsStayInline(),
 		highlight(),
 		tailwindcss(),
 		// Turns `?enhanced` image imports into AVIF, WebP and fallback files with known dimensions.
@@ -299,12 +349,13 @@ export default defineConfig(({ mode }) => ({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			// Stylesheets up to this many bytes are written into the page's HTML instead of being
+			// Stylesheets under this many bytes are written into the page's HTML instead of being
 			// linked. A linked stylesheet is a second round trip that blocks first paint: measured on
 			// this site over a 150 ms connection, inlining took first paint from about 700 ms to about
-			// 340 ms. The cost is the CSS being resent with each full page load, which compression
-			// keeps to a few kilobytes. Above the threshold it quietly goes back to a link.
-			inlineStyleThreshold: 60_000,
+			// 340 ms. The cost is the CSS being resent with each full page load: 11 KB compressed, at
+			// the 69 KB the shared stylesheet is now. From the threshold up SvelteKit quietly goes back
+			// to a link, so `stylesheetsStayInline` fails the build before it can.
+			inlineStyleThreshold: INLINE_STYLES_UNDER,
 			// Addresses are written the same way on the server and in the browser: from the root.
 			// By default the server writes them relative to the page (`./rendering`) and the browser
 			// from the root (`/rendering`), so hydration found every link on the page different from
