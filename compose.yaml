@@ -33,8 +33,15 @@ services:
       start_period: 5s
       start_interval: 1s
 
-  # Nothing connects to this yet. It is here so that the first feature to need it finds it
-  # running, with persistence already decided: the append-only file, so a restart loses nothing.
+  # Billing counts usage here (src/lib/server/billing/redis.ts). Nearly all of what it holds is a
+  # copy of what Postgres has. The exception is usage that has been allowed and not yet written
+  # to the ledger, a quarter of a second's worth, which is why there is an append-only file: a
+  # restart loses nothing. A crash can lose the last second, because the file is flushed to disk
+  # once a second and not on every write, and that second of usage would go unbilled. Flushing on
+  # every write closes that, at a cost to every request that counts something.
+  #
+  # It has no limit on memory and so never evicts. Keep it that way wherever billing runs: a
+  # counter evicted to make room is a limit that silently reset.
   redis:
     image: redis:8-alpine
     command: ["redis-server", "--appendonly", "yes"]

@@ -38,6 +38,7 @@
 	take, so the text arriving moves nothing.
 -->
 <script lang="ts">
+	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import Settings from '@lucide/svelte/icons/settings';
 	import UserRound from '@lucide/svelte/icons/user-round';
@@ -139,6 +140,10 @@
 		<a href={resolve('/account/preferences')} class={item}>
 			<Settings {...ICON} />
 			Preferences
+		</a>
+		<a href={resolve('/billing')} class={item}>
+			<CreditCard {...ICON} />
+			Billing
 		</a>
 		<!-- A plain form, sent the browser's own way: signing out is a page load either way. -->
 		<form method="POST" action={resolve('/sign-out')}>

@@ -59,6 +59,34 @@ function providerOrigins(mode: string): FormAction {
 		: providers;
 }
 
+/**
+ * Polar's own pages: the checkout the Upgrade button leads to, and the portal behind Manage
+ * billing. Each button is a form posted to this site and answered with a redirect there, so the
+ * policy has to name them for the same reason it names the sign-in providers above.
+ *
+ * Both are named, the sandbox and the real one, because which of them a server uses is decided
+ * when it starts (POLAR_SERVER in src/env.ts), after the policy has been written into the build.
+ *
+ * These two hosts are a guess. Polar's API reference describes both addresses as a string and
+ * gives no example of either (read on 2026-11-25), and nothing here has been run against the
+ * real Polar yet. The first checkout in the sandbox is the check: read the host off the address
+ * Polar hands back, and correct this if it differs. A button that does nothing when pressed, in
+ * Chromium or Safari, is what a wrong host looks like.
+ */
+const POLAR: FormAction = ['https://polar.sh', 'https://sandbox.polar.sh'];
+
+/**
+ * Where the billing buttons may end up: Polar, and the fake that stands in for it in development
+ * (scripts/mock-polar/server.js), which is named only while POLAR_MOCK_URL is set, as the fake
+ * providers are. That variable too has to be as wanted when the site is built.
+ */
+function billingOrigins(mode: string): FormAction {
+	const mock = loadEnv(mode, process.cwd(), '').POLAR_MOCK_URL;
+	return mock && URL.canParse(mock)
+		? [...POLAR, new URL(mock).origin as FormAction[number]]
+		: POLAR;
+}
+
 /** What the policy's `form-action` takes, as SvelteKit types it. */
 type FormAction = NonNullable<
 	NonNullable<
@@ -78,7 +106,13 @@ const SOURCE = `${normalizePath(resolve('src'))}/`;
  */
 const HEADER = /\/lib\/auth\/(AccountButton\.svelte|who\.svelte\.ts|marker\.ts|next\.ts)$/;
 
-/** The fields and buttons the account pages' forms are made of. No other page has one. */
+/**
+ * The fields and buttons the account pages' forms are made of. The billing page has the button
+ * too, and one of the account pages' sentences, and so fetches their file: 3.5 KB on the wire,
+ * most of which it does not run. It is left so. Nobody reaches billing without signing in, the
+ * sign-in page fetches the same file, and so it is in the browser's cache already. A file of
+ * the button's own would cost every account page one more request to save that.
+ */
 const ACCOUNT_FORMS = [`${SOURCE}lib/forms/Field.svelte`, `${SOURCE}lib/forms/Submit.svelte`];
 
 /**
@@ -383,7 +417,7 @@ export default defineConfig(({ mode }) => ({
 					'style-src-attr': ['unsafe-inline'],
 					'object-src': ['none'],
 					'base-uri': ['self'],
-					'form-action': ['self', ...providerOrigins(mode)],
+					'form-action': ['self', ...providerOrigins(mode), ...billingOrigins(mode)],
 					// Only reaches pages rendered per request. See server.js for the rest.
 					'frame-ancestors': ['none']
 				}

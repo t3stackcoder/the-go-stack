@@ -18,6 +18,34 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Billing's tests run against a real Postgres and a real Redis, because what they test is what
+    # those two do (src/lib/server/billing/testing.ts). These are the same images, names and
+    # passwords as compose.yaml, at the addresses the tests look for by default. On a developer's
+    # machine the tests are skipped when the services are not running. Here GitHub sets CI, and a
+    # service that cannot be reached fails the run.
+    services:
+      postgres:
+        image: postgres:19-alpine
+        env:
+          POSTGRES_USER: team
+          POSTGRES_PASSWORD: team
+          POSTGRES_DB: team_collaborator
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username=team --dbname=team_collaborator"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 

@@ -1,9 +1,12 @@
 {
 	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
 	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-	// Project instructions are hand-formatted. The migrations are written by drizzle-kit, which
-	// reads its own snapshots back to work out the next one, and are left exactly as it wrote them.
-	"files": { "includes": ["**", "!static", "!CLAUDE.md", "!drizzle"] },
+	// Project instructions and the billing plan are hand-formatted. The migrations are written by
+	// drizzle-kit, which reads its own snapshots back to work out the next one, and are left
+	// exactly as it wrote them.
+	"files": {
+		"includes": ["**", "!static", "!CLAUDE.md", "!polar-usage-billing-plan.md", "!drizzle"]
+	},
 	"tailwind": { "stylesheet": "./src/routes/layout.css" },
 	"formatter": { "indentStyle": "tab", "lineWidth": 100 },
 	"css": { "formatter": { "quoteStyle": "single" } },

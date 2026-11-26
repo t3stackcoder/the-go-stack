@@ -8,9 +8,9 @@
  * 3. Applies the migrations the database has not had yet (`pnpm db:migrate`).
  * 4. Builds the site (`pnpm build`).
  * 5. Stops every server of this app that is already running, in any terminal: `pnpm dev`,
- *    `pnpm preview`, `pnpm start`, and an earlier `pnpm launch`.
- * 6. Starts the production server and stays attached to it. Its log is printed here, and Ctrl+C
- *    stops it.
+ *    `pnpm preview`, `pnpm start`, `pnpm billing:worker`, and an earlier `pnpm launch`.
+ * 6. Starts the production server and the billing worker, and stays attached to both. Their logs
+ *    are printed here, and Ctrl+C stops them.
  *
  * Nothing is stopped until everything that can fail has worked. A build that does not compile, or
  * a migration the database refuses, leaves whatever was running still running.
@@ -78,6 +78,11 @@ const START = normalized(
 	JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts.start
 ).replace(/^node /, '');
 
+/** What `pnpm billing:worker` hands to Node, read the same way and for the same reason. */
+const WORKER = normalized(
+	JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts['billing:worker']
+).replace(/^node /, '');
+
 /**
  * Which of this app's servers a process is, from its command line, or undefined if it is none of
  * them. The command line is all that every platform will say about another process: Windows has
@@ -90,19 +95,25 @@ const START = normalized(
  *   a relative `server.js`, and neither it nor any of its parent processes names the project. So
  *   it is known by the command alone, and another project's server started with exactly the same
  *   command would be taken for this one's.
+ * - The billing worker is known both ways too: by its script's full path, which is how step 6
+ *   starts it, and by the command `pnpm billing:worker` runs. It serves nothing, and is stopped
+ *   with the servers because two of them cannot run at once: the second finds the first holding
+ *   the lock and gives up.
  *
  * @param {string} commandLine
- * @returns {'dev server' | 'preview server' | 'production server' | undefined}
+ * @returns {'dev server' | 'preview server' | 'production server' | 'billing worker' | undefined}
  */
 export function serverKind(commandLine) {
 	const line = normalized(commandLine);
 	if (line.endsWith(` ${START}`)) return 'production server';
+	if (line.endsWith(` ${WORKER}`)) return 'billing worker';
 
 	const at = line.indexOf(`${PROJECT}/`);
 	if (at === -1) return undefined;
 	const inside = line.slice(at + PROJECT.length);
 
 	if (/^\/server\.js( |$)/.test(inside)) return 'production server';
+	if (/^\/scripts\/billing-worker\.js( |$)/.test(inside)) return 'billing worker';
 
 	const vite = inside.match(/^\/\S*\/vite\/bin\/vite\.js( .*)?$/);
 	if (!vite) return undefined;
@@ -298,10 +309,32 @@ async function launch() {
 		console.error(`\n✗ The production server could not be started: ${failure.message}`);
 		process.exit(1);
 	});
+
+	// The billing worker, beside it and by its full path for the same reason. Without it the site
+	// serves, and nobody's subscription ever starts (src/lib/server/billing/worker/main.ts).
+	const worker = spawn(
+		process.execPath,
+		['--env-file-if-exists=.env', join(ROOT, 'scripts', 'billing-worker.js')],
+		{ cwd: ROOT, stdio: 'inherit' }
+	);
+	worker.on('error', (failure) => {
+		console.error(`\n✗ The billing worker could not be started: ${failure.message}`);
+	});
+	// It says why itself as it stops. The server is left running: every page but billing's works
+	// without the worker, and `pnpm billing:worker` in another terminal starts it again.
+	worker.on('exit', (code, killedBy) => {
+		console.log(
+			`\nThe billing worker stopped (${killedBy ? `ended by ${killedBy}` : `exit code ${code}`}). ` +
+				'The site is still up. Start the worker again with: pnpm billing:worker'
+		);
+	});
+
 	server.on('exit', (code, killedBy) => {
 		console.log(
 			`\nThe production server stopped (${killedBy ? `ended by ${killedBy}` : `exit code ${code}`}).`
 		);
+		// The worker is this launch's too, and must not outlive it.
+		worker.kill();
 		process.exit(code ?? 1);
 	});
 }

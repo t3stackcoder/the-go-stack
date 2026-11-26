@@ -36,6 +36,17 @@ describe('serverKind', () => {
 		expect(serverKind('node  --env-file-if-exists=.env server.js')).toBe('production server');
 	});
 
+	it('takes the billing worker for one, by its full path and by the command `pnpm billing:worker` runs', () => {
+		expect(
+			serverKind(
+				`"C:\\Program Files\\nodejs\\node.exe" --env-file-if-exists=.env ${inside('scripts', 'billing-worker.js')}`
+			)
+		).toBe('billing worker');
+		expect(serverKind('node  --env-file-if-exists=.env scripts/billing-worker.js')).toBe(
+			'billing worker'
+		);
+	});
+
 	it('leaves alone what this project runs that is not a server', () => {
 		expect(serverKind(`node "${VITE}" build`)).toBeUndefined();
 		expect(serverKind(`node "${VITE}" optimize`)).toBeUndefined();
