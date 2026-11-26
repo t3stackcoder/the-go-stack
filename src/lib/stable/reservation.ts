@@ -1,5 +1,5 @@
-import { dev } from '$app/env';
 import type { Attachment } from 'svelte/attachments';
+import { dev } from '$app/env';
 
 /**
  * Development-only guard for reserved boxes.

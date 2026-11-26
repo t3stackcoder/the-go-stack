@@ -29,14 +29,15 @@ export const chapters = [
 		number: '04',
 		title: 'Forms',
 		headline: 'Forms that work before JavaScript does',
-		blurb: 'Plain HTML forms, upgraded in place. Turn JavaScript off and they still submit.'
+		blurb:
+			'Plain HTML forms, upgraded in place. Break the server or turn JavaScript off, and they hold.'
 	},
 	{
 		path: '/stability',
 		number: '05',
 		title: 'Stability',
 		headline: 'Nothing moves',
-		blurb: 'How this site guarantees zero layout shift, and the audit that proves it.'
+		blurb: 'How this site avoids layout shift.'
 	},
 	{
 		path: '/tradeoffs',

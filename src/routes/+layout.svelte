@@ -1,23 +1,57 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
-	import { onNavigate } from '$app/navigation';
+	import AccountButton from '#lib/auth/AccountButton.svelte';
+	import AdminButton from '#lib/auth/AdminButton.svelte';
+	import { showMarker } from '#lib/auth/marker.js';
+	import { settleEarlyRejections } from '#lib/browser-errors.js';
+	import { keepTyped, putBackTyped } from '#lib/forms/typed.js';
+	import Hud from '#lib/hud/Hud.svelte';
+	import { markHydrated } from '#lib/stable/hydration.svelte.js';
+	import { WAIT_FLAG } from '#lib/stable/late.js';
+	import { restoreScrollOnReload } from '#lib/stable/scroll.js';
+	import AccentPicker from '#lib/theme/AccentPicker.svelte';
+	import ThemeSwitch from '#lib/theme/ThemeSwitch.svelte';
+	import { afterNavigate, onNavigate, snapshot } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import Hud from '#lib/hud/Hud.svelte';
-	import { startMetrics } from '#lib/hud/metrics.svelte.js';
-	import { chapters } from '#lib/site/chapters.js';
-	import { markHydrated } from '#lib/stable/hydration.svelte.js';
-	import ThemeSwitch from '#lib/theme/ThemeSwitch.svelte';
-	import interLatin from '@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2?url';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 
 	onMount(() => {
 		markHydrated();
-		startMetrics();
+		settleEarlyRejections();
+		restoreScrollOnReload();
+
+		// A page come back to by Back or Forward is often the browser's own copy of it, as it
+		// first arrived, and anything saved since is not on it. Measured in Chromium and Firefox:
+		// a party added to a list, the site left by a full page load, Back pressed, and the party
+		// was missing from the list 3 times of 3, though the server had it. So such a page asks
+		// for its data again. The code that asks is fetched only then, and a reload that fails
+		// leaves the page as it is.
+		const [arrival] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+		if (arrival?.type === 'back_forward') {
+			void import('#lib/forms/reload.svelte.js').then(({ reloadData }) => reloadData());
+		}
 	});
+
+	// The header's account control goes by `data-signed-in` on <html>, which the boot script in
+	// app.html sets from the marker cookie when a page loads. A move within the site loads no
+	// page, and may be the very one that signed the visitor in, so the cookie is read again
+	// after each. The two readings must agree: see src/lib/auth/marker.ts.
+	afterNavigate(({ type }) => {
+		if (type !== 'enter') showMarker();
+	});
+
+	// The pages that sign a visitor in fill the window themselves, with no header over them
+	// (src/routes/(auth)/+layout.svelte).
+	const bare = $derived(page.route.id?.startsWith('/(auth)') ?? false);
+
+	// What a visitor has typed into a form is still there when they come back to the page, as it
+	// would be in a browser left to itself. Registered here, once, so that no page with a form
+	// can forget to (see src/lib/forms/typed.ts).
+	snapshot({ id: 'typed', capture: keepTyped, restore: putBackTyped });
 
 	// Cross-fade between pages instead of a hard cut. Shallow navigations change no content, and
 	// people who ask for reduced motion get the hard cut they asked for.
@@ -29,6 +63,15 @@
 		// Verdict page). That is an update to the page in front of you, not a new page to fade to.
 		if (navigation.from?.route.id === navigation.to?.route.id) return;
 
+		// Not in Safari's engine, which is every browser on an iPhone. Its test build, on
+		// Windows, has broken on the cross-fade in two ways. A cross-fade away from a page that
+		// fits in the window crashed the tab, 3 runs of 3. And once any cross-fade had run,
+		// going Back to a page that loads data left the tab not answering: 22 tries of 50 across
+		// five pages, and none of 15 with the cross-fade off. A visitor coming back to a form
+		// found a page they could not type into. Real Safari has not been tried. Until it has,
+		// a hard cut that works is the better of the two.
+		if (navigator.vendor.startsWith('Apple')) return;
+
 		return new Promise((resolve) => {
 			document.startViewTransition(async () => {
 				resolve();
@@ -37,20 +80,28 @@
 		});
 	});
 
-	const isCurrent = (path: string) =>
-		page.url.pathname === path || page.url.pathname.startsWith(`${path}/`);
+	// This page at the address that asks the server to wait for its slow data: its own, with the
+	// flag added to whatever query it has.
+	const whole = () =>
+		`${page.url.pathname}${page.url.search ? `${page.url.search}&` : '?'}${WAIT_FLAG}=1`;
 </script>
 
-<svelte:head>
-	<!--
-		The one font file every page needs for its first paint. It is declared `font-display: optional`
-		(see layout.css), which uses Inter only if the file is ready almost at once, so it is fetched
-		as early as possible. The Latin Extended file is left out on purpose: few pages use it.
+<!--
+	A page that streams has late values still to come, and it takes JavaScript to put them on the
+	page. A browser without it is sent on to the same address with a flag added, and for that
+	address the server waits and sends the page whole (see src/lib/server/streaming.ts). With
+	JavaScript the tag does nothing.
 
-		It is written here, rather than through SvelteKit's `preload` hook, because that hook only
-		runs in production builds and the page should behave the same in development.
-	-->
-	<link rel="preload" href={interLatin} as="font" type="font/woff2" crossorigin="anonymous" />
+	A browser acts on the tag only once the response it came in has ended, which for a streamed
+	page is when the last value has settled. Measured in three browsers: a page whose slowest
+	value takes 3 s was whole after 6 s, the streamed response and then the one that waits. So the
+	first such page costs a visitor without JavaScript both, and the time limit `streaming` is
+	given bounds each of them.
+-->
+<svelte:head>
+	{#if page.data.streams}
+		<noscript><meta http-equiv="refresh" content="0; url={whole()}" /></noscript>
+	{/if}
 </svelte:head>
 
 <!--
@@ -59,54 +110,119 @@
 -->
 <a
 	href="#content"
-	class="sr-only rounded-lg bg-accent px-4 py-2 font-semibold text-accent-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-30"
+	class="sr-only rounded-lg bg-brand px-4 py-2 font-semibold text-brand-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-30"
 >
 	Skip to content
 </a>
 
 <div class="flex min-h-dvh flex-col">
-	<header class="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
-		<div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-6 px-6">
-			<a
-				href={resolve('/')}
-				class="shrink-0 font-display text-[0.9375rem] font-semibold tracking-tight"
-			>
-				The case for SvelteKit
-			</a>
-			<ThemeSwitch />
-		</div>
-
-		<!-- A plain scrolling strip rather than a menu: it needs no state, so it needs no script. -->
-		<nav aria-label="Chapters" class="mx-auto max-w-6xl overflow-x-auto px-6">
-			<ol class="flex h-10 items-center gap-5 text-sm whitespace-nowrap">
-				{#each chapters as chapter (chapter.path)}
-					<li>
-						<a
-							href={resolve(chapter.path)}
-							aria-current={isCurrent(chapter.path) ? 'page' : undefined}
-							class="flex items-baseline gap-1.5 text-ink-muted hover:text-ink aria-[current]:text-ink"
+	{#if !bare}
+		<header class="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
+			<div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-6">
+				<a
+					href={resolve('/team-collaborator')}
+					class="flex shrink-0 items-center gap-2.5 font-display text-[0.9375rem] font-semibold tracking-tight"
+				>
+					<!-- The same mark as static/favicon.svg: two people, side by side. -->
+					<span class="grid size-7 place-items-center rounded-lg bg-brand text-brand-ink">
+						<svg
+							aria-hidden="true"
+							viewBox="0 0 24 24"
+							width="16"
+							height="16"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.25"
+							stroke-linecap="round"
+							stroke-linejoin="round"
 						>
-							<span class="font-mono text-xs text-ink-subtle">{chapter.number}</span>
-							{chapter.title}
-						</a>
-					</li>
-				{/each}
-			</ol>
-		</nav>
-	</header>
+							<circle cx="9" cy="8" r="4" />
+							<path d="M2 21a7 7 0 0 1 14 0" />
+							<path d="M16 4.13a4 4 0 0 1 0 7.75M22 21a7 7 0 0 0-4.5-6.53" />
+						</svg>
+					</span>
+					<!--
+					Out of sight, though still read out, on a window too narrow for it beside the
+					three controls. It needs 413px, measured with the fallback font in WebKit, the
+					widest of the three engines where the window keeps no room for a scrollbar, which
+					is every phone (Inter needs 396px there). Chromium on a desktop keeps 15px for
+					one and needs 418px. So the name shows from 420px, and under that a 320px phone
+					does not scroll sideways. An administrator's header has the admin button too,
+					2.125rem + 2px and a gap of 0.5rem more (44px), so for them the name shows from
+					464px, the same margin over the 457px it then needs. That figure is the sum, and
+					has not been measured as the first one was.
+				-->
+					<span class="max-[26.25rem]:sr-only [:root[data-admin]_&]:max-[29rem]:sr-only"
+						>Team Collaborator</span
+					>
+				</a>
+				<!--
+				A fixed width, written out as what it holds: the theme switch (5.625rem + 2px), the
+				accent button and the account control (2.125rem + 2px each), and two gaps of 0.5rem.
+				Sized by its contents, it would be drawn narrower if the first paint came before the
+				buttons had arrived, and the switch would then move left: the shift ThemeSwitch's own
+				fixed width is there to prevent. The account control is one size whoever is looking,
+				so the sum is the same signed in and signed out.
 
-	<!-- Focusable from script only, so that following the skip link moves focus here as well as the view. -->
-	<main id="content" tabindex="-1" class="flex-1 scroll-mt-24 outline-none">
+				For an administrator it holds the admin button as well, and a third gap. Which header
+				it is is settled by the boot script before the first frame, as the button itself is
+				(src/lib/auth/AdminButton.svelte), so the wider width is never seen arriving either.
+			-->
+				<div
+					class="flex w-[calc(10.875rem+6px)] shrink-0 items-center gap-2 [:root[data-admin]_&]:w-[calc(13.5rem+8px)]"
+				>
+					<ThemeSwitch />
+					<AccentPicker />
+					<AdminButton />
+					<AccountButton />
+				</div>
+			</div>
+		</header>
+	{/if}
+
+	<!--
+		Focusable from script only, so that following the skip link moves focus here as well as the
+		view. While the readout is switched on, the bottom padding keeps the last line clear of it,
+		as it is taller on a phone. Gone with the readout, by the same attribute and so before the
+		first frame. The pages with no header fill the window edge to edge, and keep clear of the
+		readout themselves.
+	-->
+	<main
+		id="content"
+		tabindex="-1"
+		class={[
+			'flex-1 scroll-mt-14 outline-none',
+			!bare && '[:root[data-readout]_&]:pb-32 [:root[data-readout]_&]:sm:pb-24',
+			bare && 'flex flex-col'
+		]}
+	>
 		{@render children()}
 	</main>
-
-	<!-- The bottom padding keeps the last line clear of the pinned readout, which is taller on a phone. -->
-	<footer class="border-t border-line pb-32 sm:pb-24">
-		<p class="mx-auto max-w-6xl px-6 pt-8 text-sm text-ink-subtle">
-			Built with SvelteKit, Svelte, Tailwind CSS and Inter. Every number on this site is measured in
-			your browser, and every code sample is imported from the file that runs.
-		</p>
-	</footer>
 </div>
 
+<!--
+	The readout, rendered with every page so that for someone who has switched it on it is on
+	screen at first paint. For everybody else it is hidden, by CSS (see src/lib/hud/Hud.svelte).
+-->
 <Hud />
+
+<!--
+	The last thing in every page, and nothing to look at. A link in the <head> of app.html names
+	it, and the browser draws no frame until it has arrived, which is when everything above it
+	has: nothing is drawn until the page's own markup is all here, and it is held for no longer
+	than the HTML takes to arrive.
+
+	A page drawn part way through arriving is laid out as though the part were the whole, and
+	whatever is centred, or pushed to the far end of a row, moves as the rest turns up. Measured
+	on 2026-11-25 over a slow connection at a desktop width: the sign-in form, centred in the
+	window's height, moved three or four times as its fields arrived, a layout shift of 0.03 to
+	0.04 on every load. What is held back is small. The stylesheet is in the <head> and nothing
+	can be drawn before it, and what follows it is 3 to 4 KB on the wire for the home page and
+	the sign-in page.
+
+	Chromium and Safari's engine hold the frame. Firefox does not know the link and draws as the
+	HTML arrives, as every browser did before. A page that streams is not held for its late
+	values, which come after this. A page rendered only in the browser has no such element in its
+	HTML, and is drawn when the HTML ends.
+-->
+<span id="page-end" hidden></span>

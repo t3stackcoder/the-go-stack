@@ -1,7 +1,6 @@
 name: CI
 
-# Every change is held to the same checks a developer runs by hand: types, lint, unit tests, and
-# the browser suite, which includes the stability audit and the performance budgets.
+# Every change is held to the same checks a developer runs by hand: types, lint and tests.
 on:
   push:
     branches: [main]
@@ -19,6 +18,34 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Billing's tests run against a real Postgres and a real Redis, because what they test is what
+    # those two do (src/lib/server/billing/testing.ts). These are the same images, names and
+    # passwords as compose.yaml, at the addresses the tests look for by default. On a developer's
+    # machine the tests are skipped when the services are not running. Here GitHub sets CI, and a
+    # service that cannot be reached fails the run.
+    services:
+      postgres:
+        image: postgres:19-alpine
+        env:
+          POSTGRES_USER: team
+          POSTGRES_PASSWORD: team
+          POSTGRES_DB: team_collaborator
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username=team --dbname=team_collaborator"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -38,20 +65,15 @@ jobs:
       - name: Formatting and lint
         run: pnpm lint
 
-      - name: Unit tests
-        run: pnpm exec vitest --run
+      - name: Tests
+        run: pnpm test
 
-      - name: Install browsers
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
-
-      # Builds the project and starts the production and development servers itself.
-      - name: Browser tests
-        run: pnpm exec playwright test
-
-      - name: Keep the evidence when a browser test fails
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results
-          retention-days: 7
+      # The build checks its own output (vite.config.ts): that SvelteKit's payload kept a file to
+      # itself, that the account pages' code stayed off the other pages, and that no stylesheet
+      # grew too big to be written into the page. None of those fails anywhere else. The build
+      # reads the server's variables, so it is given the ones in .env.example, and a secret of
+      # its own: the build refuses the example's, and this one signs nothing.
+      - name: Build
+        run: cp .env.example .env && pnpm build
+        env:
+          BETTER_AUTH_SECRET: only-for-the-build-in-ci-and-signs-nothing

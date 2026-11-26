@@ -13,11 +13,11 @@
 </script>
 
 <svelte:head>
-	<title>{missing ? 'Page not found' : 'Something went wrong'} · The case for SvelteKit</title>
+	<title>{missing ? 'Page not found' : 'Something went wrong'} · Team Collaborator</title>
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-6 pt-20 pb-12 sm:pt-28">
-	<p class="font-mono text-sm text-accent-text">Error {page.status}</p>
+	<p class="font-mono text-sm text-brand-text">Error {page.status}</p>
 	<h1
 		class="mt-5 max-w-3xl font-display text-5xl font-semibold tracking-tight text-balance sm:text-6xl sm:leading-[1.05]"
 	>
@@ -33,8 +33,8 @@
 	{/if}
 	<p class="mt-10">
 		<a
-			href={resolve('/')}
-			class="inline-block rounded-lg bg-accent px-5 py-3 font-semibold text-accent-ink"
+			href={resolve('/team-collaborator')}
+			class="inline-block rounded-lg bg-brand px-5 py-3 font-semibold text-brand-ink"
 		>
 			Back to the start
 		</a>

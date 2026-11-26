@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import Chapter from '#lib/ui/Chapter.svelte';
 	import Code from '#lib/ui/Code.svelte';
-	import prerenderSource from '../+layout.ts?highlight';
+	import { resolve } from '$app/paths';
+	import prerenderSource from './+page.ts?highlight';
 	import clientSource from './client/+page.ts?highlight';
 	import hybridSource from './hybrid/+page.server.ts?highlight';
 	import serverSource from './server/+page.server.ts?highlight';
@@ -48,15 +48,20 @@
 	<ul class="grid gap-4 lg:grid-cols-3">
 		{#each modes as mode (mode.path)}
 			<li>
+				<!--
+					The server-only page is always reached by a full page load. Reached by a client-side
+					navigation it would be rendered in the browser, which is what it exists not to be.
+				-->
 				<a
 					href={resolve(mode.path)}
+					data-sveltekit-reload={mode.path === '/rendering/server' ? true : undefined}
 					class="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 hover:border-line-strong"
 				>
-					<p class="font-mono text-xs text-accent-text">{mode.setting}</p>
+					<p class="font-mono text-xs text-brand-text">{mode.setting}</p>
 					<h3 class="mt-3 font-display text-2xl font-semibold tracking-tight">{mode.name}</h3>
 					<p class="mt-3 text-ink-muted">{mode.sends}</p>
 					<p class="mt-2 text-sm text-ink-subtle">{mode.suits}</p>
-					<p class="mt-auto pt-6 text-sm font-medium group-hover:text-accent-text">
+					<p class="mt-auto pt-6 text-sm font-medium group-hover:text-brand-text">
 						Open it <span aria-hidden="true">→</span>
 					</p>
 				</a>
@@ -81,14 +86,17 @@
 	<section class="prose">
 		<h2>And a fourth: do not render at request time at all</h2>
 		<p>
-			This page, like most of this site, is <strong>prerendered</strong>. It was rendered once, when
-			the site was built, and is served as a compressed static file. The readout says so: where a
-			server time would be, it reads <code>prerendered</code>.
+			This page, like the opening page of each chapter that has no live data, is
+			<strong>prerendered</strong>. It was rendered once, when the site was built, and is served as
+			a compressed static file. The readout says so: where a server time would be, it reads
+			<code>prerendered</code>. A page has to ask for this. One that forgot to would be rendered per
+			request, which is slower and never wrong. The other way round, a page that reads live data
+			would be frozen with whatever the data was on the day of the build.
 		</p>
 	</section>
 
 	<div class="max-w-3xl">
-		<Code html={prerenderSource} file="src/routes/+layout.ts" />
+		<Code html={prerenderSource} file="src/routes/rendering/+page.ts" />
 	</div>
 
 	<section class="prose">

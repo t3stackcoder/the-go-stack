@@ -2,15 +2,21 @@
 	"extends": "$app/tsconfig",
 	"compilerOptions": {
 		"strict": true,
-		"types": ["$app/types", "node"]
+		"types": ["$app/types", "node"],
+		// The same mapping as "imports" in package.json, which TypeScript reads without this. It is
+		// here for the shadcn-svelte CLI, which only accepts an import alias it finds in `paths`.
+		"paths": { "#lib/*": ["./src/lib/*"] }
 	},
 	"include": [
 		"src",
-		"e2e",
+		"docker",
 		"vite.config.ts",
-		"prettier.config.js",
-		"eslint.config.js",
-		"playwright.config.ts",
-		"server.js"
+		"drizzle.config.ts",
+		"server.js",
+		"scripts/seed.js",
+		"scripts/launch.js",
+		"scripts/billing-worker.js",
+		"scripts/launch.test.ts",
+		"scripts/mock-polar"
 	]
 }

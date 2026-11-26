@@ -15,7 +15,7 @@
 </script>
 
 <div
-	class="grid gap-4 text-sm tabular-nums accent-accent *:grid *:grid-cols-[4.5rem_1fr_3rem] *:items-center *:gap-4"
+	class="grid gap-4 text-sm tabular-nums accent-brand *:grid *:grid-cols-[4.5rem_1fr_3rem] *:items-center *:gap-4"
 >
 	<label>
 		Bill
@@ -41,6 +41,6 @@
 	</div>
 	<div>
 		<dt class="text-sm text-ink-muted">Each pays</dt>
-		<dd class="font-display text-3xl font-semibold text-accent-text">{each.toFixed(2)}</dd>
+		<dd class="font-display text-3xl font-semibold text-brand-text">{each.toFixed(2)}</dd>
 	</div>
 </dl>

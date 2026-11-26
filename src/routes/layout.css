@@ -1,4 +1,19 @@
 @import 'tailwindcss';
+/* The enter and exit animations the shadcn-svelte components name: `animate-in`, `fade-in-0` and so on. */
+@import 'tw-animate-css';
+
+/*
+ * Tailwind writes CSS for every class in every file it reads, used or not, and every
+ * shadcn-svelte component is installed. Read in full, they took the stylesheet from 42 KB to
+ * 222 KB, past the size at which it is written into the page (see vite.config.ts), and every page
+ * paid for a second round trip before first paint. So only the components in use are read.
+ * src/components.test.ts fails when a component is used and not listed here.
+ *
+ * The `/*` matters: with the folder itself excluded, Tailwind ignores the folders listed under it.
+ */
+@source not '../lib/components/ui/*';
+@source '../lib/components/ui/card';
+@source '../lib/components/ui/switch';
 
 /*
  * `dark:` must agree with the tokens below in all three states: an explicit dark choice, an
@@ -17,22 +32,67 @@
 }
 
 /*
+ * The shadcn-svelte components style their on and off states with `data-checked:` and
+ * `data-unchecked:`, which Tailwind reads as an attribute of that name being present. The bits-ui
+ * they are built on says it with `data-state` instead ("checked" or "unchecked") and sets neither,
+ * so none of those styles applied: the switch had no track colour, a thumb the colour of the page
+ * and a thumb that never moved, and on the dark theme it could not be seen at all. Both variants
+ * are given the meaning the components need here, once, for every component that uses them.
+ */
+@custom-variant data-checked (&[data-state='checked']);
+@custom-variant data-unchecked (&[data-state='unchecked']);
+
+/*
  * Inter, self-hosted. One variable file carries both the weight axis and the optical-size axis,
  * so "Inter" and "Inter Display" are the same download: `opsz` 14 is the text cut, 32 the display cut.
  *
- * Three things together keep text from re-flowing: `font-display: optional`, the preload in
- * +layout.svelte, and the script in app.html. Inter is used if it has loaded when the first frame
- * is drawn. Otherwise the page keeps the fallback for that visit, and the cached file is used from
- * the next page load on.
+ * The file is a cut of the package's own, with the weight axis narrowed to the weights in use,
+ * 400 to 700: 51 KB in place of 73 KB, on a file that first paint can wait for. Every character
+ * and feature is kept. A lighter or heavier weight is drawn at the nearest end of that range until
+ * the range is widened in app.html, here, and in scripts/subset-font.py, which makes the file.
  *
- * `optional` alone is enough in Chromium, which holds the first frame back briefly for a preloaded
- * font and never changes font afterwards. It is not enough elsewhere. Measured on a production
- * build with the font delayed by 0 to 1500 ms: Firefox laid text out a second time about 100 ms
- * after first paint, and WebKit swapped the fallback for Inter on the first client-side navigation
- * after a slow load. So the script takes the decision out of the browser's hands: at the first
- * frame, if Inter has not loaded, it marks the page (`data-font="fallback"`, styled further down)
- * and Inter leaves the font stack for the rest of the visit. e2e/fonts.e2e.ts holds all three
- * browsers to one font per visit.
+ * That file is not declared here. The script in app.html declares it and asks for it, from the
+ * top of the <head>, because a rule down here is read too late: behind a proxy this stylesheet
+ * arrived a round trip after the start of the page. What follows is the second file, for Latin
+ * Extended, which is left to the browser, and the fallback.
+ *
+ * Two things together keep text from re-flowing: `font-display: optional`, and that script, which
+ * asks for the font before anything is drawn. Inter is used if it has loaded when
+ * the first frame is drawn. Otherwise the page keeps the fallback for that visit, and the cached
+ * file is used from the next page load on.
+ *
+ * `optional` alone is enough in Chromium, which holds the first frame back briefly for a font
+ * asked for in the <head> and never changes font afterwards. It is not enough elsewhere. Measured
+ * on a production build with the font delayed by 0 to 1500 ms: Firefox laid text out a second time
+ * about 100 ms after first paint, and WebKit swapped the fallback for Inter on the first
+ * client-side navigation after a slow load. So the script takes the decision out of the browser's
+ * hands: at the first frame, if Inter has not loaded, it marks the page (`data-font="fallback"`,
+ * styled further down) and Inter leaves the font stack for the rest of the visit.
+ *
+ * Chromium's hold has a price: about 100 ms of first paint, paid whether or not the font arrives.
+ * So the script only asks when the font can make it: on a later visit, when the file should be in
+ * the cache (the script notes in localStorage that this browser has asked for it before), or when
+ * the server is close. Otherwise it takes the fallback at once, and fetches the font for next time
+ * three seconds after the page has loaded. Not sooner, because a font the page asks for is sent
+ * ahead of scripts: fetched at load over HTTP/1.1, it made the page slower to respond than it had
+ * been before any of this (941 ms against 793 ms after the HTML, at a 150 ms round trip).
+ *
+ * "Close" is a server that answered the page within 35 ms. The answer time is read from the
+ * browser's own record of the page load, less the rendering time the server reports in its
+ * Server-Timing header, and it runs a few milliseconds over the network's round trip. The figure
+ * was measured on 2026-11-21, on first visits with real network delay between a browser and this
+ * server in containers. The font shares the connection with the page's scripts, and arrived three
+ * round trips after it was asked for behind an HTTP/2 proxy, four over HTTP/1.1. Behind the proxy
+ * it made the first frame every time up to a round trip of 35 ms and never at 40 ms, so the
+ * cut-off asks up to a round trip of about 28 ms. Reached directly over HTTP/1.1 it made the
+ * first frame up to 20 ms, so between there and the cut-off such a visit waits for nothing.
+ *
+ * What that buys, from the connection opening to first paint on a first visit behind the proxy:
+ * 239 ms before and 148 ms now at a 30 ms round trip, 539 and 435 at 100 ms. Inside the cut-off
+ * the page still waits for Inter and starts in it, about 205 ms at a 25 ms round trip.
+ *
+ * That is also why there is no <link rel="preload"> for the font. A preload link holds the first
+ * frame in the same way, and it cannot be made conditional.
  *
  * (The development server can show a tiny shift of its own, because it re-injects this
  * stylesheet after load.)
@@ -40,19 +100,8 @@
 @font-face {
 	font-family: 'Inter';
 	font-style: normal;
-	font-weight: 100 900;
-	font-display: optional;
-	src: url('@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2')
-		format('woff2-variations');
-	unicode-range:
-		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-	font-family: 'Inter';
-	font-style: normal;
-	font-weight: 100 900;
+	/* The package's file goes further, but the two files must agree on what a weight means. */
+	font-weight: 400 700;
 	font-display: optional;
 	src: url('@fontsource-variable/inter/files/inter-latin-ext-opsz-normal.woff2')
 		format('woff2-variations');
@@ -85,8 +134,11 @@
 
 	/*
 	 * Colour. The default palette is removed so that every colour in the app is a semantic token
-	 * with a light and a dark value. A hard-coded `bg-white` cannot be written by accident.
-	 * Each pairing used for text is checked against WCAG AA (4.5:1); `ink` clears AAA (7:1).
+	 * with a light and a dark value. A hard-coded `bg-gray-100` cannot be written by accident; black
+	 * and white, below, are the only fixed colours, for the components that need them.
+	 * Each pairing used for text is checked against WCAG AA (4.5:1); `ink` clears AAA (7:1). The
+	 * brand pairings are also checked with APCA, which judges saturated colours more as people see
+	 * them (see "Accents" below).
 	 */
 	--color-*: initial;
 
@@ -101,15 +153,53 @@
 	--color-ink-muted: light-dark(oklch(0.45 0.02 265), oklch(0.74 0.015 265));
 	--color-ink-subtle: light-dark(oklch(0.53 0.018 265), oklch(0.64 0.018 265));
 
-	/* `accent` is a fill; `accent-ink` is text on that fill; `accent-text` is accent-coloured text. */
-	--color-accent: light-dark(oklch(0.66 0.2 42), oklch(0.72 0.19 45));
-	--color-accent-ink: oklch(0.18 0.03 45);
-	--color-accent-text: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
-	--color-accent-soft: light-dark(oklch(0.955 0.03 50), oklch(0.28 0.05 45));
+	/*
+	 * `brand` is a fill; `brand-ink` is text on that fill; `brand-text` is brand-coloured text.
+	 * These are the default accent, orange. The others are further down, under "Accents". The
+	 * fill is the same in both themes, and text on it is white for every accent.
+	 */
+	--color-brand: oklch(0.575 0.172 42);
+	--color-brand-ink: oklch(1 0 0);
+	--color-brand-text: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
+	--color-brand-soft: light-dark(oklch(0.955 0.03 50), oklch(0.3 0.03 45));
 
 	--color-good: light-dark(oklch(0.5 0.14 155), oklch(0.8 0.16 155));
 	--color-warn: light-dark(oklch(0.52 0.13 80), oklch(0.84 0.14 85));
 	--color-bad: light-dark(oklch(0.52 0.2 27), oklch(0.75 0.16 25));
+
+	/*
+	 * The names the shadcn-svelte components (src/lib/components/ui) are written against, given
+	 * this palette's values. So the components follow the theme switch like everything else, and
+	 * restyling them is done here, not in their files, which the CLI may overwrite.
+	 * `accent` is shadcn's: the quiet highlight of a hovered menu item, not the brand colour.
+	 */
+	--color-background: var(--color-canvas);
+	--color-foreground: var(--color-ink);
+	--color-card: var(--color-surface);
+	--color-card-foreground: var(--color-ink);
+	--color-popover: var(--color-surface);
+	--color-popover-foreground: var(--color-ink);
+	--color-primary: var(--color-brand);
+	--color-primary-foreground: var(--color-brand-ink);
+	--color-secondary: var(--color-sunken);
+	--color-secondary-foreground: var(--color-ink);
+	--color-muted: var(--color-sunken);
+	--color-muted-foreground: var(--color-ink-muted);
+	--color-accent: var(--color-sunken);
+	--color-accent-foreground: var(--color-ink);
+	--color-destructive: var(--color-bad);
+	--color-border: var(--color-line);
+	--color-input: var(--color-line-strong);
+	--color-ring: var(--color-brand);
+	--color-sidebar: var(--color-surface);
+	--color-sidebar-foreground: var(--color-ink);
+	--color-sidebar-accent: var(--color-sunken);
+	--color-sidebar-accent-foreground: var(--color-ink);
+	--color-sidebar-border: var(--color-line);
+	--color-sidebar-ring: var(--color-brand);
+	/* Overlays behind dialogs and sheets are black at partial opacity, in either theme. */
+	--color-black: oklch(0 0 0);
+	--color-white: oklch(1 0 0);
 }
 
 @layer base {
@@ -145,8 +235,15 @@
 		min-height: 100dvh;
 	}
 
+	/* A border written without a colour is the hairline, as the components expect. */
+	*,
+	::before,
+	::after {
+		border-color: var(--color-border);
+	}
+
 	:focus-visible {
-		outline: 2px solid var(--color-accent);
+		outline: 2px solid var(--color-brand);
 		outline-offset: 2px;
 	}
 
@@ -154,11 +251,82 @@
 		*,
 		::before,
 		::after {
+			/* biome-ignore-start lint/complexity/noImportantStyles: a visitor's request for less motion overrides every animation, whatever its specificity */
 			animation-duration: 0.01ms !important;
 			animation-iteration-count: 1 !important;
 			transition-duration: 0.01ms !important;
 			scroll-behavior: auto !important;
+			/* biome-ignore-end lint/complexity/noImportantStyles: the visitor's request for less motion */
 		}
+	}
+}
+
+/*
+ * Accents: the brand tokens again, for each colour in the picker (src/lib/theme/AccentPicker.svelte).
+ * The boot script in app.html puts the visitor's choice on <html> as `data-accent`, and orange is
+ * no attribute. The rules are not tied to <html>, so a swatch in the picker sets its own accent
+ * and its `bg-brand` is that colour, in whichever of light and dark is showing. That is why orange
+ * is repeated here: inside a page in another accent, its swatch has to be told it is orange.
+ *
+ * Every accent has the same shape: a mid-dark fill, the same in both themes, under white text
+ * (`brand-ink`, set once in @theme). Each pairing used for text passes two checks, in both themes:
+ * WCAG AA (4.5:1), and APCA Lc 60, the level APCA asks of text. The pairings are `brand-ink` on
+ * `brand`, `brand-text` on canvas, surface, sunken and `brand-soft`, and `ink` on `brand-soft`.
+ * The lowest are 4.71:1 (white on orange) and Lc 60 (pink and orange links in dark).
+ *
+ * Both checks matter. Under WCAG's formula alone, near-black text on these fills scored higher
+ * than white, and the first palette used it: but APCA put it at Lc 40 to 43 on purple, blue, red,
+ * pink and orange, and it looked as murky as that. Dark text cannot pass both: a fill light enough
+ * for it is too pale to stand out from the page. White passes both. Each fill is also at least
+ * 4:1 against the page in either theme, for the focus ring and the other marks drawn in it.
+ */
+@layer base {
+	[data-accent='orange'] {
+		--color-brand: oklch(0.575 0.172 42);
+		--color-brand-text: light-dark(oklch(0.5 0.18 38), oklch(0.8 0.14 55));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 50), oklch(0.3 0.03 45));
+	}
+
+	[data-accent='red'] {
+		--color-brand: oklch(0.58 0.205 22);
+		--color-brand-text: light-dark(oklch(0.5 0.16 22), oklch(0.815 0.12 22));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 22), oklch(0.3 0.03 22));
+	}
+
+	[data-accent='amber'] {
+		--color-brand: oklch(0.56 0.117 75);
+		--color-brand-text: light-dark(oklch(0.5 0.11 75), oklch(0.8 0.13 75));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 75), oklch(0.3 0.03 75));
+	}
+
+	[data-accent='green'] {
+		--color-brand: oklch(0.54 0.147 150);
+		--color-brand-text: light-dark(oklch(0.5 0.13 150), oklch(0.8 0.15 150));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 150), oklch(0.3 0.03 150));
+	}
+
+	[data-accent='teal'] {
+		--color-brand: oklch(0.545 0.094 190);
+		--color-brand-text: light-dark(oklch(0.5 0.1 190), oklch(0.8 0.11 190));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 190), oklch(0.3 0.03 190));
+	}
+
+	[data-accent='blue'] {
+		--color-brand: oklch(0.56 0.17 258);
+		--color-brand-text: light-dark(oklch(0.5 0.18 258), oklch(0.8 0.11 258));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 258), oklch(0.3 0.03 258));
+	}
+
+	[data-accent='purple'] {
+		--color-brand: oklch(0.575 0.2 295);
+		--color-brand-text: light-dark(oklch(0.5 0.2 295), oklch(0.8 0.12 295));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 295), oklch(0.3 0.03 295));
+	}
+
+	[data-accent='pink'] {
+		--color-brand: oklch(0.58 0.195 350);
+		--color-brand-text: light-dark(oklch(0.5 0.18 350), oklch(0.8 0.12 350));
+		--color-brand-soft: light-dark(oklch(0.955 0.03 350), oklch(0.3 0.03 350));
 	}
 }
 
@@ -172,6 +340,11 @@
 		grid-template: minmax(0, 1fr) / minmax(0, 1fr);
 	}
 
+	/* One cell, whatever is in the box: a note laid over a placeholder shares it, and adds no row. */
+	.reserve > * {
+		grid-area: 1 / 1;
+	}
+
 	/* Arriving content fades in. Opacity only: it is composited, and cannot move anything. */
 	.reserve-content {
 		display: grid;
@@ -183,6 +356,160 @@
 		border-radius: 0.5rem;
 		background-color: var(--color-sunken);
 		animation: skeleton-pulse 1.6s ease-in-out infinite;
+	}
+}
+
+/*
+ * Tooltips. One look, with an arrow, in two forms:
+ *
+ * - `.tooltip`, an element: what a field says when the browser turns it down. The field places
+ *   it and writes it (src/lib/forms/Field.svelte).
+ * - `data-tip="…"`, an attribute: a hint on a control, or the whole of some text that has been
+ *   cut short, shown under the thing when it is pointed at or reached by keyboard. It is used
+ *   where `title` would be. A `title`'s tooltip is the browser's own: it looks different in
+ *   each, cannot be styled, and never shows for a keyboard.
+ *
+ * The hint is CSS and nothing else, so it works on a page that ships no JavaScript, and costs
+ * the header, which is on every page, no script. It is not for a screen reader: whatever
+ * carries one has a name of its own already, which is what is read out.
+ *
+ * A hint is not made until it is wanted: with no `content` there is no box. A hidden box would
+ * still count towards what the page can be scrolled across, and one near the window's edge
+ * would let the page slide sideways with nothing there to see. For the same reason one at the
+ * end of a row is lined up with `data-tip-at="end"`, and stays inside the window when it shows.
+ */
+@layer components {
+	.tooltip,
+	[data-tip]::after {
+		position: absolute;
+		z-index: 10;
+		border: 1px solid var(--color-line-strong);
+		border-radius: 0.5rem;
+		background-color: var(--color-surface);
+		padding: 0.375rem 0.75rem;
+		color: var(--color-ink);
+		font-size: 0.875rem;
+		font-weight: 500;
+		line-height: 1.25rem;
+		box-shadow:
+			0 10px 24px -6px oklch(0 0 0 / 0.18),
+			0 2px 6px oklch(0 0 0 / 0.08);
+	}
+
+	/*
+	 * The arrow: a square turned on its corner, half of it behind the tooltip's top edge, with
+	 * the tooltip's background and the two sides of its border that show.
+	 */
+	.tooltip::before,
+	[data-tip]::before {
+		position: absolute;
+		width: 0.5625rem;
+		height: 0.5625rem;
+		border-top: 1px solid var(--color-line-strong);
+		border-left: 1px solid var(--color-line-strong);
+		background-color: var(--color-surface);
+		rotate: 45deg;
+	}
+
+	.tooltip::before {
+		top: -0.3125rem;
+		left: 0.875rem;
+		content: '';
+	}
+
+	/*
+	 * Each fades in as it drops the last 3px into place, so it is seen to arrive. The animation
+	 * runs when the box is made, and for a hint it is named in the rules below that make the box,
+	 * along with the pause before it. Named here for all three, it ran in Chromium and Firefox,
+	 * and WebKit showed the hint at once with no pause: measured, it starts no animation for a
+	 * pseudo-element that carried the name before it had a box.
+	 */
+	.tooltip,
+	[data-tip]::before,
+	[data-tip]::after {
+		translate: var(--tip-x, 0) 0;
+	}
+
+	.tooltip {
+		animation: tooltip-arrive 120ms ease-out backwards;
+	}
+
+	/* The hint is placed against what carries it. A utility that positions the thing still wins. */
+	[data-tip] {
+		position: relative;
+	}
+
+	/* Under the middle of the thing, 10px clear of it, as the field's is. */
+	[data-tip]::after {
+		--tip-x: -50%;
+
+		top: calc(100% + 0.625rem);
+		left: 50%;
+		width: max-content;
+		max-width: 16rem;
+		overflow-wrap: anywhere;
+		text-align: left;
+		white-space: normal;
+		pointer-events: none;
+	}
+
+	/* Above the box, so that it covers the stretch of the box's border it stands on. */
+	[data-tip]::before {
+		--tip-x: -50%;
+
+		top: calc(100% + 0.375rem);
+		left: 50%;
+		z-index: 11;
+		pointer-events: none;
+	}
+
+	/* From the thing's own edge: for text, which starts there, and for the first thing in a row. */
+	[data-tip][data-tip-at='start']::after {
+		--tip-x: 0;
+
+		left: 0;
+	}
+
+	[data-tip][data-tip-at='start']::before {
+		--tip-x: 0;
+
+		left: 0.9375rem;
+	}
+
+	/* Back from the thing's far edge, with the arrow still under its middle. */
+	[data-tip][data-tip-at='end']::after {
+		--tip-x: 0;
+
+		right: 0;
+		left: auto;
+	}
+
+	/*
+	 * Pointed at: after a pause, so that a pointer on its way past raises nothing. Only where
+	 * there is a pointer that can hover. A finger's press is taken for one, and the hint would
+	 * come up on the press and stay.
+	 */
+	@media (hover: hover) {
+		[data-tip]:hover::after {
+			content: attr(data-tip);
+			animation: tooltip-arrive 120ms ease-out 350ms backwards;
+		}
+
+		[data-tip]:hover::before {
+			content: '';
+			animation: tooltip-arrive 120ms ease-out 350ms backwards;
+		}
+	}
+
+	/* Reached by keyboard: at once. Written last, so that it is at once when pointed at as well. */
+	[data-tip]:focus-visible::after {
+		content: attr(data-tip);
+		animation: tooltip-arrive 120ms ease-out backwards;
+	}
+
+	[data-tip]:focus-visible::before {
+		content: '';
+		animation: tooltip-arrive 120ms ease-out backwards;
 	}
 }
 
@@ -226,7 +553,7 @@
 	}
 
 	.prose a {
-		color: var(--color-accent-text);
+		color: var(--color-brand-text);
 		text-decoration: underline;
 		text-underline-offset: 3px;
 	}
@@ -275,6 +602,13 @@
 	}
 }
 
+@keyframes tooltip-arrive {
+	from {
+		opacity: 0;
+		translate: var(--tip-x, 0) -3px;
+	}
+}
+
 @keyframes skeleton-pulse {
 	50% {
 		opacity: 0.55;
@@ -285,4 +619,31 @@
 ::view-transition-old(root),
 ::view-transition-new(root) {
 	animation-duration: 140ms;
+}
+
+/*
+ * A change of theme cross-fades too (the boot script in app.html), and takes what the theme
+ * switch's thumb takes to slide, on the thumb's curve, so the two arrive together.
+ */
+:root[data-theme-fade]::view-transition-old(*),
+:root[data-theme-fade]::view-transition-new(*) {
+	animation-duration: 300ms;
+	animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/*
+ * The thumb is not faded: it is drawn as it is, sliding. The fade is from a picture of the page
+ * as it was, and in that picture the thumb is where it started. Left in, it was seen twice: a
+ * ghost fading out where it had been, under the real one on its way. So the thumb is given a
+ * layer of its own for the fade (ThemeSwitch.svelte names it, and why its options have layers
+ * too): no picture of where it was, and the live one neither faded nor moved by the browser,
+ * which would move it a second time.
+ */
+::view-transition-old(theme-thumb) {
+	display: none;
+}
+
+::view-transition-new(theme-thumb),
+::view-transition-group(theme-thumb) {
+	animation: none;
 }

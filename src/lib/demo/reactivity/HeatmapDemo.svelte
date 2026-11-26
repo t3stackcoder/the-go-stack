@@ -88,7 +88,7 @@
 		<div class="mt-2 grid grid-cols-4 gap-1 rounded-lg border border-line bg-sunken p-1">
 			{#each RATES as rate (rate)}
 				<label
-					class="relative cursor-pointer rounded-md px-3 py-1.5 text-center text-sm text-ink-muted tabular-nums has-checked:bg-surface has-checked:font-semibold has-checked:text-ink has-checked:shadow-sm has-focus-visible:outline-2 has-focus-visible:outline-accent"
+					class="relative cursor-pointer rounded-md px-3 py-1.5 text-center text-sm text-ink-muted tabular-nums has-checked:bg-surface has-checked:font-semibold has-checked:text-ink has-checked:shadow-sm has-focus-visible:outline-2 has-focus-visible:outline-brand"
 				>
 					<input type="radio" name="per-frame" value={rate} bind:group={perFrame} class="sr-only" />
 					{count(rate)}
@@ -102,7 +102,7 @@
 			type="button"
 			aria-pressed={running}
 			onclick={toggle}
-			class="col-span-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink sm:w-24"
+			class="col-span-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-ink sm:w-24"
 		>
 			{running ? 'Stop' : 'Start'}
 		</button>

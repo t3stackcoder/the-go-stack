@@ -1,17 +1,29 @@
 <script lang="ts">
 	import DemoFrame from '#lib/demo/data/DemoFrame.svelte';
-	import type { PageProps } from './$types';
-	import pageSource from './+page.svelte?highlight';
+	import { addressForm } from '#lib/forms/address-form.js';
+	import formSource from '#lib/forms/address-form.ts?highlight';
 	import serverSource from './+page.server.ts?highlight';
+	import pageSource from './+page.svelte?highlight';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	// The box takes the query as its default, not its value, so what a visitor types while the
+	// page is still loading survives hydration. `addressForm` then sends it, and shows the
+	// address's query again after a link or Back.
+	let form: HTMLFormElement;
+	addressForm(
+		() => form,
+		(fields) => fields.get('q') === data.query
+	);
 </script>
 
 <DemoFrame
 	path="/data/search"
 	files={[
 		{ html: serverSource, file: 'src/routes/data/search/+page.server.ts' },
-		{ html: pageSource, file: 'src/routes/data/search/+page.svelte' }
+		{ html: pageSource, file: 'src/routes/data/search/+page.svelte' },
+		{ html: formSource, file: 'src/lib/forms/address-form.ts' }
 	]}
 >
 	<!--
@@ -19,21 +31,30 @@
 		makes the same request as a client-side navigation. `reset={false}` keeps focus and scroll
 		where they are, and `replacestate` stops every keystroke adding a history entry.
 	-->
-	<form method="GET" role="search" data-sveltekit-reset={false} data-sveltekit-replacestate>
+	<form
+		bind:this={form}
+		method="GET"
+		role="search"
+		data-sveltekit-reset={false}
+		data-sveltekit-replacestate
+	>
 		<label for="q" class="text-sm font-medium">Search by code, phrase or kind</label>
 		<div class="mt-2 flex gap-2">
 			<input
 				id="q"
 				name="q"
 				type="search"
-				value={data.query}
+				defaultValue={data.query}
 				placeholder="Try 404 or “not”"
 				autocomplete="off"
 				spellcheck="false"
 				oninput={(event) => event.currentTarget.form?.requestSubmit()}
 				class="min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 py-2"
 			/>
-			<button class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink">
+			<button
+				type="submit"
+				class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-ink"
+			>
 				Search
 			</button>
 		</div>
@@ -57,7 +78,7 @@
 				<li
 					class="grid h-10 grid-cols-[3rem_minmax(0,1fr)] items-center gap-3 border-b border-line px-3 text-sm sm:grid-cols-[3rem_minmax(0,1fr)_6rem]"
 				>
-					<span class="font-mono font-semibold text-accent-text">{status.code}</span>
+					<span class="font-mono font-semibold text-brand-text">{status.code}</span>
 					<span class="truncate">{status.phrase}</span>
 					<span class="hidden text-xs text-ink-subtle sm:block">{status.kind}</span>
 				</li>

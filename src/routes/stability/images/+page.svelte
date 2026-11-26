@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import dune from '#lib/assets/demo/dune.jpg?enhanced';
 	import moor from '#lib/assets/demo/moor.jpg?enhanced';
 	// Shown almost as wide as the page, so it is built at several widths for the browser to choose from.
@@ -8,9 +7,10 @@
 	import Image from '#lib/stable/Image.svelte';
 	import imageSource from '#lib/stable/Image.svelte?highlight';
 	import Code from '#lib/ui/Code.svelte';
-	import type { PageProps } from './$types';
-	import pageSource from './+page.svelte?highlight';
+	import { resolve } from '$app/paths';
 	import serverSource from './+page.server.ts?highlight';
+	import pageSource from './+page.svelte?highlight';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
@@ -38,7 +38,7 @@
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-6 pt-10 pb-12">
-	<a href={resolve('/stability')} class="font-mono text-sm text-accent-text hover:underline">
+	<a href={resolve('/stability')} class="font-mono text-sm text-brand-text hover:underline">
 		← Chapter 05 · Stability
 	</a>
 
@@ -68,7 +68,7 @@
 		<ul class="mt-3 space-y-2 text-ink-muted">
 			{#each notice as item (item)}
 				<li class="flex gap-3">
-					<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+					<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
 					<span>{item}</span>
 				</li>
 			{/each}

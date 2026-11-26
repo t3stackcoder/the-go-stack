@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { refreshAll } from '$app/navigation';
 	import DemoFrame from '#lib/demo/data/DemoFrame.svelte';
-	import type { PageProps } from './$types';
-	import pageSource from './+page.svelte?highlight';
+	import { refreshAll } from '$app/navigation';
 	import serverSource from './+page.server.ts?highlight';
+	import pageSource from './+page.svelte?highlight';
+	import type { PageProps } from './$types';
 
 	// No type is written here: `PageProps` is generated from what `load` returns.
 	let { data }: PageProps = $props();
@@ -49,8 +49,9 @@
 
 	<form onsubmit={refresh} class="mt-6">
 		<button
+			type="submit"
 			disabled={refreshing}
-			class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-60"
+			class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-ink disabled:opacity-60"
 		>
 			Run load again
 		</button>

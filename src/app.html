@@ -5,52 +5,240 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
 		<meta name="color-scheme" content="light dark" />
-		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
-		%sveltekit.head%
 		<!--
-			Runs before first paint, and after the stylesheet above so that the font it asks about
-			has been declared. It settles two things the server cannot know: the theme (rationale
-			in src/lib/theme/ThemeSwitch.svelte) and the font (rationale in src/routes/layout.css).
+			Runs before first paint, and ahead of everything SvelteKit adds to the head, so that
+			it is in the first piece of the page to arrive. It settles five things the server
+			cannot know, or cannot say in a page built once for everybody: the theme (rationale
+			in src/lib/theme/ThemeSwitch.svelte), the accent colour
+			(src/lib/theme/AccentPicker.svelte), whether this browser is signed in and what the
+			marker says of the person (src/lib/auth/marker.ts), the font (rationale in
+			src/routes/layout.css) and where a refreshed page was left (rationale in
+			src/lib/stable/scroll.ts).
 		-->
 		<script>
 			(() => {
 				const root = document.documentElement;
 
-				const apply = (theme) => {
-					if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
-					else delete root.dataset.theme;
+				// A visitor's choice, kept in localStorage under `key` and shown as `data-<key>` on
+				// <html>, where the stylesheet reads it. The first value is the default: no attribute
+				// and nothing stored, so a value no longer offered falls back to it. Returns the
+				// function that makes a choice. Other open tabs are kept in step. `show` is how a
+				// choice the visitor has just made is put on the page: at once, unless told otherwise.
+				const setting = (key, [fallback, ...others], show = (change) => change()) => {
+					const apply = (value) => {
+						if (others.includes(value)) root.dataset[key] = value;
+						else delete root.dataset[key];
+					};
+
+					// What is chosen now. Remembered here, and not read back from <html> when a
+					// choice is made: one that is shown with a fade is put there a frame later, and
+					// the small movement in a press and its release arrive together. Read back, the
+					// release was taken for a second choice: two fades for one press, the first cut
+					// short and reported as an error, and the theme changed with no fade at all
+					// (seen in the log from Chrome and Edge, then measured).
+					let chosen = fallback;
+					const settle = (value) => {
+						apply(value);
+						chosen = root.dataset[key] ?? fallback;
+					};
+
+					// Storage can be unavailable (blocked cookies, some private modes). The default
+					// is then shown and the choice is not kept, which is the correct degradation.
+					try {
+						settle(localStorage.getItem(key));
+					} catch {}
+
+					addEventListener('storage', (event) => {
+						if (event.key === key) settle(event.newValue);
+					});
+
+					return (value) => {
+						if (value === chosen) return;
+						chosen = value;
+						show(() => apply(value));
+						try {
+							if (others.includes(value)) localStorage.setItem(key, value);
+							else localStorage.removeItem(key);
+						} catch {}
+					};
 				};
 
-				// Storage can be unavailable (blocked cookies, some private modes). The theme then
-				// simply follows the system and is not persisted, which is the correct degradation.
-				try {
-					apply(localStorage.getItem('theme'));
-				} catch {}
+				// A chosen theme fades in over the old one, for as long as the switch's thumb takes
+				// to slide to it: changed in a single frame, the whole page had moved before the
+				// thumb had set off. The browser draws the fade from a picture of the page as it
+				// was, so nothing is laid out again for it. `data-theme-fade` is on <html> while it
+				// runs, and gives the fade its length (layout.css). A browser that cannot do this
+				// changes at once, as does one whose visitor has asked for less motion.
+				//
+				// So does Safari's engine, for now, as it is kept from the fade between pages (the
+				// root layout says what that did to its test build). Here the same build did not
+				// draw the thumb at all while a fade ran: measured, on the site and on a bare page
+				// with nothing else on it. Real Safari has not been tried.
+				let fading;
+				const fade = (change) => {
+					if (
+						!document.startViewTransition ||
+						matchMedia('(prefers-reduced-motion: reduce)').matches ||
+						navigator.vendor.startsWith('Apple')
+					) {
+						return change();
+					}
+					root.dataset.themeFade = '';
+					const mine = (fading = document.startViewTransition(change));
+					// A second choice cuts the first fade short, and this one is then not the last.
+					const done = () => {
+						if (fading === mine) delete root.dataset.themeFade;
+					};
+					mine.finished.then(done, done);
+					// A fade cut short before it has begun says so by rejecting `ready`. That is
+					// expected, and answered here: unanswered, the browser reports an error nobody
+					// caught, and the site records it.
+					mine.ready.catch(() => {});
+				};
+
+				const chooseTheme = setting('theme', ['system', 'light', 'dark'], fade);
+				// The accents in AccentPicker.svelte, default first; src/lib/theme/accents.test.ts checks.
+				const chooseAccent = setting('accent', [
+					'orange',
+					'red',
+					'amber',
+					'green',
+					'teal',
+					'blue',
+					'purple',
+					'pink'
+				]);
+
+				// The theme option at a point, by measuring. The event's own target cannot be
+				// trusted for it, nor `elementFromPoint`: while a fade runs, Chromium and WebKit
+				// answer every point with <html> (measured), and a second press on the switch, or
+				// a slide across it, would go nowhere for the length of the fade.
+				const themeAt = ({ clientX: x, clientY: y }) =>
+					[...document.querySelectorAll('[data-theme-set]')].find((option) => {
+						const box = option.getBoundingClientRect();
+						return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
+					});
 
 				addEventListener('click', (event) => {
-					const theme = event.target.closest?.('[data-theme-set]')?.dataset.themeSet;
-					if (!theme) return;
-					apply(theme);
-					try {
-						if (theme === 'system') localStorage.removeItem('theme');
-						else localStorage.setItem('theme', theme);
-					} catch {}
+					// The target first: a press from the keyboard is at no point at all.
+					const theme = (event.target.closest?.('[data-theme-set]') ?? themeAt(event))?.dataset
+						.themeSet;
+					if (theme) chooseTheme(theme);
+					const accent = event.target.closest?.('[data-accent-set]')?.dataset.accentSet;
+					if (accent) chooseAccent(accent);
 				});
 
-				// Keep other open tabs in step.
-				addEventListener('storage', (event) => {
-					if (event.key === 'theme') apply(event.newValue);
+				// The switch also slides: press anywhere on it and move across it, and the theme
+				// follows the pointer from segment to segment until it is let go.
+				addEventListener('pointerdown', (event) => {
+					const group =
+						event.target.closest?.('[data-theme-group]') ??
+						themeAt(event)?.closest('[data-theme-group]');
+					if (!group) return;
+					const follow = (event) => {
+						const option = themeAt(event);
+						if (option && group.contains(option)) chooseTheme(option.dataset.themeSet);
+					};
+					const stop = () => {
+						removeEventListener('pointermove', follow);
+						removeEventListener('pointerup', stop);
+						removeEventListener('pointercancel', stop);
+					};
+					addEventListener('pointermove', follow);
+					addEventListener('pointerup', stop);
+					addEventListener('pointercancel', stop);
 				});
+
+				// Whether this browser is signed in, by the marker cookie the server keeps beside
+				// the session's. On <html> as `data-signed-in`, "yes" or "no", where the header's
+				// stylesheet reads it: with no attribute nothing has said, which is a browser
+				// without JavaScript. Beside it, one attribute for each flag the marker carries:
+				// `data-admin` when the person may open the admin area, which shows the header's
+				// admin button, and `data-readout` when they have switched the readout on, which
+				// shows it. A page brought back whole by Back or Forward is as it was left, and the
+				// visitor may have signed in or out since, so it is asked again whenever a page is
+				// shown. (`showMarker` in src/lib/auth/marker.ts does the same after a move within
+				// the site, and the two must agree.)
+				const showSignedIn = () => {
+					const marker = /(^|; )signed-in=([^;]*)/.exec(document.cookie)?.[2];
+					const flags = marker?.split('.') ?? [];
+					root.dataset.signedIn = marker !== undefined ? 'yes' : 'no';
+					if (flags.includes('admin')) root.dataset.admin = '';
+					else delete root.dataset.admin;
+					if (flags.includes('readout')) root.dataset.readout = '';
+					else delete root.dataset.readout;
+				};
+				showSignedIn();
+				addEventListener('pageshow', showSignedIn);
 
 				// The font for this visit is settled when the first frame is drawn: Inter if it has
-				// loaded by then, the fallback from then on if it has not. Asking for it here starts
-				// the download before anything on the page has had the chance to.
-				document.fonts.load('1em Inter').catch(() => {});
-				requestAnimationFrame(() => {
-					if (!document.fonts.check('1em Inter')) root.dataset.font = 'fallback';
+				// loaded by then, the fallback from then on if it has not. The font is declared
+				// here and not in the stylesheet, which arrives too late to ask from.
+				const inter = new FontFace('Inter', "url(/fonts/inter-latin.woff2) format('woff2')", {
+					weight: '400 700',
+					display: 'optional',
+					unicodeRange:
+						'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD'
 				});
+				const useFallback = () => (root.dataset.font = 'fallback');
+				const fetchInter = () => {
+					inter.load().catch(() => {});
+					try {
+						localStorage.setItem('font-asked', '1');
+					} catch {}
+				};
+
+				// Asking here makes Chromium hold the first frame for the font, so only ask when it
+				// can arrive in time: it is cached, or the server is close. Otherwise take the
+				// fallback now and fetch the font after load, for next time. (This script is sent
+				// with every page, so the reasoning and the figures are kept in layout.css.)
+				let cached = true; // If storage cannot be read, it may be cached.
+				try {
+					cached = localStorage.getItem('font-asked');
+				} catch {}
+
+				// How long the server took to answer, less the time it says it spent rendering.
+				const [entry] = performance.getEntriesByType('navigation');
+				const roundTrip = entry
+					? entry.responseStart -
+						entry.requestStart -
+						(entry.serverTiming?.find((timing) => timing.name === 'render')?.duration ?? 0)
+					: 0;
+
+				if (cached || roundTrip < 35) {
+					document.fonts.add(inter);
+					fetchInter();
+					requestAnimationFrame(() => {
+						if (inter.status !== 'loaded') useFallback();
+					});
+				} else {
+					useFallback();
+					// Not at once: the font is not for this visit, and fetched now it would be
+					// sent ahead of the scripts the page is still waiting for.
+					addEventListener('load', () => setTimeout(fetchInter, 3000));
+				}
+
+				// A refreshed page goes back to where it was left before its first frame is drawn.
+				// The browser does that itself, except WebKit while a response is still streaming.
+				// (Where it was left is recorded, and the reasoning kept, in src/lib/stable/scroll.ts.)
+				try {
+					const left = JSON.parse(sessionStorage.getItem('left-at'));
+					sessionStorage.removeItem('left-at');
+					if (entry?.type === 'reload' && left?.[0] === location.href && left[1] > 0) {
+						const put = () => {
+							if (scrollY) return; // The browser got there first, or the visitor did.
+							if (root.scrollHeight - innerHeight >= left[1]) scrollTo(0, left[1]);
+							else if (document.readyState === 'loading') requestAnimationFrame(put);
+						};
+						requestAnimationFrame(put);
+					}
+				} catch {}
 			})();
 		</script>
+		<!-- Holds the first frame until the whole page has arrived. Why: src/routes/+layout.svelte. -->
+		<link rel="expect" href="#page-end" blocking="render" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>

@@ -4,9 +4,9 @@
 -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { resolve } from '$app/paths';
 	import Code from '#lib/ui/Code.svelte';
 	import Demo from '#lib/ui/Demo.svelte';
+	import { resolve } from '$app/paths';
 
 	const demos = [
 		{
@@ -78,12 +78,16 @@
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-6 pt-10 pb-12">
-	<a href={resolve('/data')} class="font-mono text-sm text-accent-text hover:underline">
+	<a href={resolve('/data')} class="font-mono text-sm text-brand-text hover:underline">
 		← Chapter 03 · Data
 	</a>
 
 	<nav aria-label="Data demos" class="mt-6">
-		<ul class="inline-flex gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
+		<!--
+			A block that hugs its tabs, not an inline box. A page can be painted while its HTML is
+			still arriving, and an inline box drawn empty moved up when its tabs turned up.
+		-->
+		<ul class="flex w-fit gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
 			{#each demos as candidate (candidate.path)}
 				<li>
 					<!-- The streaming demo times a full page load, so links to it always make one. -->
@@ -113,7 +117,7 @@
 			<ul class="mt-3 space-y-2 text-ink-muted">
 				{#each demo.notice as item (item)}
 					<li class="flex gap-3">
-						<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+						<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
 						<span>{item}</span>
 					</li>
 				{/each}
@@ -122,9 +126,7 @@
 	</div>
 
 	<div class="mt-10">
-		<Demo title={demo.title} note={demo.note}>
-			{@render children()}
-		</Demo>
+		<Demo title={demo.title} note={demo.note}> {@render children()} </Demo>
 	</div>
 
 	<h2 class="mt-16 font-display text-2xl font-semibold tracking-tight">The code</h2>
@@ -132,8 +134,8 @@
 		The complete files behind the demo above, imported into this page from the files that run it.
 	</p>
 	<div class="mt-6 max-w-4xl space-y-6">
-		{#each files as { html, file } (file)}
-			<Code {html} {file} />
+		{#each files as source (source.file)}
+			<Code html={source.html} file={source.file} />
 		{/each}
 	</div>
 </div>

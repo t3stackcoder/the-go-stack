@@ -14,7 +14,11 @@ interface InteractionEntry extends PerformanceEntry {
 	interactionId?: number;
 }
 
-class PageMetrics {
+/**
+ * One page's measurements. Created by the readout itself, and not when this module is loaded, so
+ * that importing this module measures nothing.
+ */
+export class PageMetrics {
 	/** Milliseconds from the start of the page load until hydration finished. */
 	hydratedAt = $state<number>();
 
@@ -36,59 +40,60 @@ class PageMetrics {
 	 * `undefined` where the browser cannot measure it, so that neither is ever shown as a number.
 	 */
 	slowestResponse = $state<number | null>();
-}
 
-export const metrics = new PageMetrics();
+	/**
+	 * Starts measuring, with the moment hydration finished. Called once, by the readout when it
+	 * mounts, which is at the end of hydration.
+	 */
+	start(hydratedAt: number) {
+		this.hydratedAt = hydratedAt;
 
-/** Starts measuring. Called once by the root layout when hydration finishes. */
-export function startMetrics() {
-	metrics.hydratedAt = performance.now();
+		const [load] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+		this.serverMs = load?.serverTiming.find((timing) => timing.name === 'render')?.duration;
 
-	const [load] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
-	metrics.serverMs = load?.serverTiming.find((timing) => timing.name === 'render')?.duration;
+		const resources = new PerformanceObserver((list) => {
+			for (const entry of list.getEntries() as PerformanceResourceTiming[]) {
+				if (/\.js(\?|$)/.test(entry.name)) this.scriptBytes += entry.encodedBodySize;
+			}
+		});
+		resources.observe({ type: 'resource', buffered: true });
 
-	const resources = new PerformanceObserver((list) => {
-		for (const entry of list.getEntries() as PerformanceResourceTiming[]) {
-			if (/\.js(\?|$)/.test(entry.name)) metrics.scriptBytes += entry.encodedBodySize;
+		if (PerformanceObserver.supportedEntryTypes.includes('layout-shift')) {
+			this.layoutShift = 0;
+			const shifts = new PerformanceObserver((list) => {
+				for (const entry of list.getEntries() as LayoutShiftEntry[]) {
+					// Movement within half a second of the visitor's own input is expected, and the
+					// standard metric leaves it out.
+					if (!entry.hadRecentInput) this.layoutShift = (this.layoutShift ?? 0) + entry.value;
+				}
+			});
+			shifts.observe({ type: 'layout-shift', buffered: true });
 		}
-	});
-	resources.observe({ type: 'resource', buffered: true });
 
-	if (PerformanceObserver.supportedEntryTypes.includes('layout-shift')) {
-		metrics.layoutShift = 0;
-		const shifts = new PerformanceObserver((list) => {
-			for (const entry of list.getEntries() as LayoutShiftEntry[]) {
-				// Movement within half a second of the visitor's own input is expected, and the
-				// standard metric leaves it out.
-				if (!entry.hadRecentInput) metrics.layoutShift = (metrics.layoutShift ?? 0) + entry.value;
-			}
-		});
-		shifts.observe({ type: 'layout-shift', buffered: true });
-	}
-
-	// Interactions are told apart from hovers and movement by their interaction id, so a browser
-	// that reports event timings without ids cannot give this figure either.
-	if (
-		PerformanceObserver.supportedEntryTypes.includes('event') &&
-		'interactionId' in PerformanceEventTiming.prototype
-	) {
-		metrics.slowestResponse = null;
-		const interactions = new PerformanceObserver((list) => {
-			for (const entry of list.getEntries() as InteractionEntry[]) {
-				if (!entry.interactionId) continue;
-				metrics.slowestResponse = Math.max(metrics.slowestResponse ?? 0, entry.duration);
-			}
-		});
-		// `event` entries are only reported from 16 ms up, the lowest threshold the browser allows.
-		// (The option is real; TypeScript's description of the browser does not list it yet.)
-		// `first-input` reports the first interaction however quick it was, so there is a figure to
-		// show as soon as there has been one.
-		interactions.observe({ type: 'first-input', buffered: true });
-		interactions.observe({
-			type: 'event',
-			durationThreshold: 16,
-			buffered: true
-		} as PerformanceObserverInit);
+		// Interactions are told apart from hovers and movement by their interaction id, so a browser
+		// that reports event timings without ids cannot give this figure either.
+		if (
+			PerformanceObserver.supportedEntryTypes.includes('event') &&
+			'interactionId' in PerformanceEventTiming.prototype
+		) {
+			this.slowestResponse = null;
+			const interactions = new PerformanceObserver((list) => {
+				for (const entry of list.getEntries() as InteractionEntry[]) {
+					if (!entry.interactionId) continue;
+					this.slowestResponse = Math.max(this.slowestResponse ?? 0, entry.duration);
+				}
+			});
+			// `event` entries are only reported from 16 ms up, the lowest threshold the browser allows.
+			// (The option is real; TypeScript's description of the browser does not list it yet.)
+			// `first-input` reports the first interaction however quick it was, so there is a figure to
+			// show as soon as there has been one.
+			interactions.observe({ type: 'first-input', buffered: true });
+			interactions.observe({
+				type: 'event',
+				durationThreshold: 16,
+				buffered: true
+			} as PerformanceObserverInit);
+		}
 	}
 }
 

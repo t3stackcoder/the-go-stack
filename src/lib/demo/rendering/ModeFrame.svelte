@@ -4,10 +4,10 @@
 -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { resolve } from '$app/paths';
 	import CatalogGrid from '#lib/demo/CatalogGrid.svelte';
 	import type { Product } from '#lib/demo/catalog.js';
 	import Code from '#lib/ui/Code.svelte';
+	import { resolve } from '$app/paths';
 
 	const modes = [
 		{ path: '/rendering/server', label: 'Server only', tab: 'Server only' },
@@ -44,17 +44,27 @@
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-6 pt-10 pb-12">
-	<a href={resolve('/rendering')} class="font-mono text-sm text-accent-text hover:underline">
+	<a href={resolve('/rendering')} class="font-mono text-sm text-brand-text hover:underline">
 		← Chapter 01 · Rendering
 	</a>
 
 	<nav aria-label="Rendering modes" class="mt-6">
-		<ul class="inline-flex gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
+		<!--
+			A block that hugs its tabs, not an inline box. A page can be painted while its HTML is
+			still arriving, and an inline box drawn empty moved up when its tabs turned up.
+		-->
+		<ul class="flex w-fit gap-1 rounded-xl border border-line bg-sunken p-1 text-sm">
 			{#each modes as candidate (candidate.path)}
 				<li>
+					<!--
+						The link to the server-only page always makes a full page load. `csr = false` is a
+						setting the server reads. A page already running in the browser cannot see it, and
+						would render that page itself: with JavaScript, and a readout that wakes up.
+					-->
 					<a
 						href={resolve(candidate.path)}
 						aria-current={candidate.path === path ? 'page' : undefined}
+						data-sveltekit-reload={candidate.path === '/rendering/server' ? true : undefined}
 						class="block rounded-lg px-3 py-1.5 whitespace-nowrap text-ink-muted hover:text-ink aria-[current]:bg-surface aria-[current]:font-medium aria-[current]:text-ink aria-[current]:shadow-sm"
 					>
 						{candidate.tab}
@@ -73,7 +83,7 @@
 			<ul class="mt-3 space-y-2 text-ink-muted">
 				{#each notice as item (item)}
 					<li class="flex gap-3">
-						<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+						<span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
 						{item}
 					</li>
 				{/each}

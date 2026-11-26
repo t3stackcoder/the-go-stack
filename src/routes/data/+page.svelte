@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import Chapter from '#lib/ui/Chapter.svelte';
 	import Code from '#lib/ui/Code.svelte';
+	import { resolve } from '$app/paths';
 	import streamingSource from './streaming/+page.server.ts?highlight';
 
 	const demos = [
@@ -56,11 +56,11 @@
 					data-sveltekit-reload={demo.path === '/data/streaming' ? true : undefined}
 					class="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 hover:border-line-strong"
 				>
-					<p class="font-mono text-xs text-accent-text">{demo.label}</p>
+					<p class="font-mono text-xs text-brand-text">{demo.label}</p>
 					<h3 class="mt-3 font-display text-2xl font-semibold tracking-tight">{demo.name}</h3>
 					<p class="mt-3 text-ink-muted">{demo.shows}</p>
 					<p class="mt-2 text-sm text-ink-subtle">{demo.try}</p>
-					<p class="mt-auto pt-6 text-sm font-medium group-hover:text-accent-text">
+					<p class="mt-auto pt-6 text-sm font-medium group-hover:text-brand-text">
 						Open it <span aria-hidden="true">→</span>
 					</p>
 				</a>
@@ -73,9 +73,9 @@
 		<p>
 			SvelteKit generates types for each route from its files. The page imports
 			<code>PageProps</code> from <code>./$types</code>, and <code>data</code> has exactly the shape
-			that <code>load</code> returned. There is no interface to declare and no cast on a parsed response,
-			so there is nothing to fall out of step: change what the server returns, and the type check points
-			at every line of the template that relied on the old shape.
+			that <code>load</code> returned. There is no interface to declare and no cast on a parsed
+			response, so there is nothing to fall out of step: change what the server returns, and the
+			type check points at every line of the template that relied on the old shape.
 		</p>
 		<p>
 			The data is not limited to what JSON can carry. A <code>Date</code> returned on the server is
@@ -89,13 +89,15 @@
 		<p>
 			Most pages mix fast data with slow: the product is quick to read, its reviews come from
 			another service. If <code>load</code> awaits everything, the page waits for the slowest part.
-			It does not have to. A promise that <code>load</code> returns without awaiting is not waited for:
-			the page is sent with everything else, and the promise's value is streamed into the same HTTP response
-			when it settles.
+			It does not have to. A promise that <code>load</code> returns without awaiting is not waited
+			for: the page is sent with everything else, and the promise's value is streamed into the same
+			HTTP response when it settles.
 		</p>
 		<p>
 			This is the whole server side of the streaming demo. Four of the values are promises, and the
-			only sign of it in the page is that their panels arrive later.
+			only sign of it in the page is that their panels arrive later. They are handed over through
+			<code>streaming</code>, this site's one helper for slow data, which is what the limits below
+			are about.
 		</p>
 	</section>
 
@@ -107,14 +109,25 @@
 		<p>
 			On this site each streamed value lands in a box reserved for it, so its arrival moves nothing,
 			and a promise that rejects shows its error in the same box. A promise that might reject also
-			needs a <code>catch</code> attached on the server, as above: if it failed before the page started
-			rendering, nothing would be listening yet, and by default Node exits on an unhandled rejection.
+			needs a <code>catch</code> attached on the server: if it failed before the page started
+			rendering, nothing would be listening yet, and by default Node exits on an unhandled
+			rejection. The helper attaches one to every promise it is given.
 		</p>
-		<h3>Three limits worth knowing</h3>
+		<h3>Four limits worth knowing</h3>
 		<ul>
 			<li>
 				Streaming needs JavaScript in the browser. The late values arrive as small scripts at the
-				end of the response; without JavaScript, their placeholders stay where they are.
+				end of the response, and without JavaScript their placeholders would stay where they are. So
+				a page that streams carries one <code>&lt;noscript&gt;</code> tag, which sends a browser
+				without JavaScript to the same address with <code>?nojs=1</code> added. For that address the
+				helper waits for every promise, and the page arrives whole. It is not free: a browser
+				follows that tag only when the streamed response has ended, so such a visitor waits for the
+				slow data twice. Turn JavaScript off and open the demo to see it.
+			</li>
+			<li>
+				A promise that never settles keeps the response open for as long as the visitor stays. The
+				helper takes a time limit, five seconds in the demo, and when it passes the panel shows a
+				failure and the response ends.
 			</li>
 			<li>
 				Some hosting platforms buffer responses. SvelteKit's documentation names AWS Lambda and
@@ -142,8 +155,8 @@
 			The form that sets them is a plain HTML form with <code>method="GET"</code>. Without
 			JavaScript, the browser submits it and the server renders the results. With JavaScript,
 			SvelteKit turns the submission into a client-side navigation: the same <code>load</code>
-			runs, only its data crosses the network, and two attributes keep focus in the search box and the
-			history clean.
+			runs, only its data crosses the network, and two attributes keep focus in the search box and
+			the history clean.
 		</p>
 	</section>
 

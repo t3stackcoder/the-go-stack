@@ -8,8 +8,8 @@
 	let { arrival }: { arrival: Promise<string> } = $props();
 </script>
 
-<Streamed promise={arrival} class="h-20">
+<Streamed value={arrival} class="h-20">
 	{#snippet children(message: string)}
-		<p class="rounded-lg bg-accent-soft p-3 text-sm">{message}</p>
+		<p class="rounded-lg bg-brand-soft p-3 text-sm">{message}</p>
 	{/snippet}
 </Streamed>

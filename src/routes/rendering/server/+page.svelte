@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ModeFrame from '#lib/demo/rendering/ModeFrame.svelte';
-	import type { PageProps } from './$types';
 	import source from './+page.server.ts?highlight';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>

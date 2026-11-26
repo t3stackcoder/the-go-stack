@@ -1,11 +1,19 @@
 <!--
 	Theme control. It deliberately has no script.
 
-	Clicks are handled by the theme boot script in app.html, and which option looks (and reads as)
-	selected is derived in CSS from the `data-theme` attribute on <html>. The server cannot know the
+	Clicks, and the slide of a press dragged across the segments, are handled by the theme boot
+	script in app.html. Which option looks (and reads as) selected, and where the thumb sits under
+	it, is derived in CSS from the `data-theme` attribute on <html>. The server cannot know the
 	stored choice, so anything rendered from component state here would be wrong in the HTML and
 	corrected after hydration: a visible flicker. Deriving it in CSS makes it right at first paint,
 	on every kind of page, including pages that ship no JavaScript.
+
+	The group has a fixed width, written out as what it holds: three buttons of 1.625rem, two gaps
+	of 0.125rem, two paddings of 0.25rem, and a border of 1px on each side. It is the first thing in the
+	page that is pushed to the right, and a page's first paint can come while its HTML is still
+	arriving. Sized by its contents, the group was then drawn with one button and moved left as the
+	others turned up: a layout shift, recorded on 6 of 16 loads over a slow connection. Change the
+	options, and the width has to be changed with them, and so do the thumb's offsets below.
 -->
 <script lang="ts" module>
 	const options = [
@@ -15,17 +23,23 @@
 	] as const;
 </script>
 
+<!-- `touch-none`: a finger sliding across the switch changes the theme instead of scrolling the page. -->
 <div
 	role="group"
 	aria-label="Theme"
-	class="flex h-8 items-center gap-0.5 rounded-full border border-line bg-sunken p-0.5"
+	data-theme-group
+	class="relative flex h-[calc(2.125rem+2px)] w-[calc(5.625rem+2px)] shrink-0 touch-none items-center gap-0.5 rounded-full border border-brand/25 bg-brand-soft p-1 select-none"
 >
+	<span
+		aria-hidden="true"
+		class="thumb pointer-events-none absolute top-1 left-1 size-6.5 rounded-full bg-brand"
+	></span>
 	{#each options as option (option.value)}
 		<button
 			type="button"
 			data-theme-set={option.value}
-			title={option.label}
-			class="grid size-6.5 place-items-center rounded-full text-ink-subtle hover:text-ink"
+			data-tip={option.label}
+			class="option relative grid size-6.5 place-items-center rounded-full text-ink-muted hover:text-ink"
 		>
 			<svg
 				viewBox="0 0 16 16"
@@ -62,12 +76,57 @@
 		display: none;
 	}
 
+	/*
+	 * One step is a button and a gap: 1.625rem + 0.125rem. The thumb is placed before first paint
+	 * like everything else here, and a transition runs only on a change, so it slides when the
+	 * theme is changed and never on arrival. Reduced motion stops it (see layout.css).
+	 */
+	.thumb {
+		box-shadow: 0 1px 3px oklch(0 0 0 / 0.25);
+		transition: translate 300ms cubic-bezier(0.65, 0, 0.35, 1);
+	}
+
+	/*
+	 * While a change of theme fades (the boot script in app.html puts `data-theme-fade` on
+	 * <html>), the thumb is on a layer of its own, so that it is drawn sliding and not faded:
+	 * see layout.css. A layer is drawn over the page's, and the thumb's would cover the icon
+	 * that stands on it, so each option has a layer too, above the thumb's. Those fade like the
+	 * page. A name has to be the only one of its kind on the page: with a second switch the
+	 * browser would drop the fade, and the theme would change at once, as it used to.
+	 */
+	:global(:root[data-theme-fade]) .thumb {
+		view-transition-name: theme-thumb;
+	}
+
+	:global(:root[data-theme-fade]) [data-theme-set='system'] {
+		view-transition-name: theme-system;
+	}
+
+	:global(:root[data-theme-fade]) [data-theme-set='light'] {
+		view-transition-name: theme-light;
+	}
+
+	:global(:root[data-theme-fade]) [data-theme-set='dark'] {
+		view-transition-name: theme-dark;
+	}
+
+	/* The selected icon changes colour in step with the thumb arriving under it. */
+	.option {
+		transition: color 300ms cubic-bezier(0.65, 0, 0.35, 1);
+	}
+
+	:global(:root[data-theme='light']) .thumb {
+		translate: 1.75rem 0;
+	}
+
+	:global(:root[data-theme='dark']) .thumb {
+		translate: 3.5rem 0;
+	}
+
 	:global(:root:not([data-theme])) [data-theme-set='system'],
 	:global(:root[data-theme='light']) [data-theme-set='light'],
 	:global(:root[data-theme='dark']) [data-theme-set='dark'] {
-		background-color: var(--color-surface);
-		color: var(--color-ink);
-		box-shadow: 0 0 0 1px var(--color-line);
+		color: var(--color-brand-ink);
 	}
 
 	:global(:root:not([data-theme])) [data-theme-set='system'] .selected,

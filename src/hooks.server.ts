@@ -1,10 +1,14 @@
 import { pipeline, Readable } from 'node:stream';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { constants, createBrotliCompress, createGzip } from 'node:zlib';
-import { building } from '$app/env';
+import { error } from '@sveltejs/kit';
 import type { Handle, HandleServerError } from '@sveltejs/kit/hooks';
-import { describeError, errorReference, UNEXPECTED } from '#lib/errors.js';
-import { record } from '#lib/server/log.js';
+import { requirePermission } from '#lib/server/auth/access.js';
+import { answerAuth, findSession } from '#lib/server/auth/call.js';
+import type { Session } from '#lib/server/auth/index.js';
+import { recordFault, recordRefusal } from '#lib/server/faults.js';
+import { building, dev } from '$app/env';
+import { STRESS_PAGES } from '$app/env/private';
 
 const COMPRESSIBLE = /^(text\/|application\/(json|javascript|xml))/;
 
@@ -20,17 +24,24 @@ const COMPRESSIBLE = /^(text\/|application\/(json|javascript|xml))/;
  * page back until more data arrived, and streaming would stop being streaming.
  */
 function compress(request: Request, response: Response): Response {
-	const accepted = request.headers.get('accept-encoding') ?? '';
-	const encoding = /\bbr\b/.test(accepted) ? 'br' : /\bgzip\b/.test(accepted) ? 'gzip' : undefined;
-
 	if (
-		!encoding ||
 		!response.body ||
 		response.headers.has('content-encoding') ||
 		!COMPRESSIBLE.test(response.headers.get('content-type') ?? '')
 	) {
 		return response;
 	}
+
+	// From here on the answer depends on what the browser said it accepts, whether or not this
+	// one ends up compressed. A cache has to be told, or it could hand the compressed copy to a
+	// client that cannot read it.
+	if (!/\baccept-encoding\b/i.test(response.headers.get('vary') ?? '')) {
+		response.headers.append('vary', 'Accept-Encoding');
+	}
+
+	const accepted = request.headers.get('accept-encoding') ?? '';
+	const encoding = /\bbr\b/.test(accepted) ? 'br' : /\bgzip\b/.test(accepted) ? 'gzip' : undefined;
+	if (!encoding) return response;
 
 	const compressor =
 		encoding === 'br'
@@ -50,7 +61,6 @@ function compress(request: Request, response: Response): Response {
 
 	const headers = new Headers(response.headers);
 	headers.set('content-encoding', encoding);
-	headers.append('vary', 'Accept-Encoding');
 	// The length is no longer the original's, and is not known until the stream ends.
 	headers.delete('content-length');
 
@@ -61,9 +71,52 @@ function compress(request: Request, response: Response): Response {
 	});
 }
 
+/**
+ * Whether a request is one of Better Auth's own: the address a provider sends a visitor back
+ * to, and the links in the emails. The site has no route under this address, and its forms
+ * never post here: they go to actions, which ask Better Auth themselves
+ * (src/lib/server/auth/call.ts).
+ */
+const AUTH = /^\/api\/auth(\/|$)/;
+
+/** The routes of the admin area, by their id. */
+const ADMIN = /^\/admin(\/|$)/;
+
 export const handle: Handle = async ({ event, resolve }) => {
+	// The pages under /stress push the foundation harder than the chapters do, and are not for
+	// visitors: anyone can ask one to hold a response or an action open, render twenty thousand
+	// rows, or write an error to the log, as often as they like. Outside development they answer
+	// as though they did not exist, unless STRESS_PAGES says otherwise (see src/env.ts). The
+	// check is here and not in a layout's `load`, which a form action never passes through.
+	if (!dev && !STRESS_PAGES && /^\/stress(\/|$)/.test(event.route.id ?? '')) {
+		error(404, 'Not Found');
+	}
+
 	const started = performance.now();
-	const response = await resolve(event);
+
+	// While building, pages are being prerendered: nobody is signed in, there is no database to
+	// ask, and nothing is added. Otherwise Better Auth answers what is addressed to it, and
+	// every other request is given a way to ask who is signed in. Only a way: the session is
+	// looked up when a page or an action first asks, once for the request, and a page that
+	// never asks costs no query.
+	let response: Response;
+	if (building) {
+		response = await resolve(event);
+	} else if (AUTH.test(event.url.pathname)) {
+		response = await answerAuth(event);
+	} else {
+		let found: Promise<Session | null> | undefined;
+		event.locals.session = () => (found ??= findSession(event));
+
+		// Everything under /admin is for those whose role opens it: its pages, the data a page
+		// asks for when it is moved to within the site, its forms' actions, and any endpoint
+		// that is added there later. Checked here, before any of their own code runs, so that a
+		// page added under /admin is closed without having to remember to be. What a page or an
+		// action needs beyond getting in, it checks itself (src/lib/server/auth/access.ts).
+		if (ADMIN.test(event.route.id ?? '')) await requirePermission(event, { adminArea: ['open'] });
+
+		response = await resolve(event);
+	}
 
 	// How long the server took to produce the response, reported to the browser so the on-page
 	// readout can show it. For a streamed page this is the time until the page started to be
@@ -71,9 +124,26 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// static files and never pass through here, so they carry no timing.
 	response.headers.set('Server-Timing', `render;dur=${(performance.now() - started).toFixed(1)}`);
 
-	// While building, responses are being written to disk as prerendered files, which the
-	// adapter compresses itself.
-	return building ? response : compress(event.request, response);
+	// While building, responses are being written to disk as prerendered files. The adapter
+	// compresses those itself, and serves them with headers of its own.
+	if (building) return response;
+
+	// A page rendered for this request is this visitor's, as of now: a shared cache must not keep
+	// it, and the browser must ask again before showing its copy. Without the header a browser
+	// decides for itself how long the page stays fresh. A page that can be kept longer says so
+	// from its `load` function, with `setHeaders`, and that is left alone.
+	//
+	// Back and Forward are the exception no header short of `no-store` closes: a browser may show
+	// its copy there without asking. Measured in Chromium and Firefox, and settled in the root
+	// layout, where a page come back to asks for its data again.
+	if (
+		!response.headers.has('cache-control') &&
+		response.headers.get('content-type')?.startsWith('text/html')
+	) {
+		response.headers.set('cache-control', 'private, no-cache');
+	}
+
+	return compress(event.request, response);
 };
 
 /**
@@ -86,23 +156,12 @@ export const handle: Handle = async ({ event, resolve }) => {
  * An unexpected error is a fault in the code or in something it depends on. Its message was
  * written for developers and may carry details that must not leave the server, so the visitor is
  * shown a fixed sentence and a reference, and the error itself is recorded under that reference.
- *
- * The query string is left out of the record, because that is where personal details end up.
  */
 export const handleError: HandleServerError = ({ error, event, kind }) => {
-	const request = {
-		method: event.request.method,
-		path: event.url.pathname,
-		route: event.route.id
-	};
-
 	if (kind !== 'unknown') {
-		record('info', 'request refused', { kind, status: error.status, ...request });
+		recordRefusal(kind, error.status, event);
 		return;
 	}
 
-	const reference = errorReference();
-	record('error', 'unexpected error', { reference, ...request, ...describeError(error) });
-
-	return { message: UNEXPECTED, reference };
+	return recordFault(error, event);
 };

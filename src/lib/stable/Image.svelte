@@ -1,6 +1,7 @@
 <!--
 	The one way to put an image on a page. Its box is sized before any of the image has arrived, so
-	the image cannot move what is around it. A lint rule forbids a bare <img> anywhere else.
+	the image cannot move what is around it. A test (src/markup.test.ts) forbids a bare <img>
+	anywhere else.
 
 	An image file in this repository is imported with `?enhanced`. The build reads its dimensions
 	and writes it as AVIF, WebP and its original format, so there is nothing to declare:

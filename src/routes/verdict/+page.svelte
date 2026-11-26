@@ -1,12 +1,24 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import { questions, type Outcome } from '#lib/demo/verdict/decide.js';
+	import { type Outcome, questions } from '#lib/demo/verdict/decide.js';
+	import { addressForm } from '#lib/forms/address-form.js';
 	import Chapter from '#lib/ui/Chapter.svelte';
+	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	const answered = $derived(Object.keys(data.answers).length);
+
+	// What is ticked belongs to the form, as it does with JavaScript switched off. The address
+	// gives each radio its default (`defaultChecked` in the template) and the browser keeps what
+	// the visitor ticks, so an answer given while the page was still loading survives hydration.
+	// `addressForm` settles the moments when the form and the address disagree (Start again, Back,
+	// an answer ticked before hydration).
+	let form: HTMLFormElement;
+	addressForm(
+		() => form,
+		(ticked) => questions.every(({ id }) => (ticked.get(id) ?? undefined) === data.answers[id])
+	);
 
 	const outcomes: Record<Outcome, { title: string; summary: string; next: string; tone: string }> =
 		{
@@ -44,6 +56,7 @@
 		scroll position and focus and replaces the history entry instead of adding one.
 	-->
 	<form
+		bind:this={form}
 		method="GET"
 		data-sveltekit-reset="false"
 		data-sveltekit-replacestate
@@ -60,15 +73,15 @@
 						{#each question.options as option (option.value)}
 							<!-- The selected look comes from `:checked` in CSS, so it is right before hydration. -->
 							<label
-								class="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface p-4 hover:border-line-strong has-checked:border-accent has-checked:bg-accent-soft"
+								class="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface p-4 hover:border-line-strong has-checked:border-brand has-checked:bg-brand-soft"
 							>
 								<input
 									type="radio"
 									name={question.id}
 									value={option.value}
-									checked={data.answers[question.id] === option.value}
+									defaultChecked={data.answers[question.id] === option.value}
 									onchange={(event) => event.currentTarget.form?.requestSubmit()}
-									class="mt-1 size-4 shrink-0 accent-accent"
+									class="mt-1 size-4 shrink-0 accent-brand"
 								/>
 								<span>{option.label}</span>
 							</label>
@@ -80,7 +93,7 @@
 			<noscript>
 				<button
 					type="submit"
-					class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
+					class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-ink"
 				>
 					Show my verdict
 				</button>
@@ -128,7 +141,7 @@
 
 				<p class="mt-6 border-t border-line pt-4 text-sm text-ink-subtle">
 					This verdict is in the address of this page. Send the link to whoever decides with you.
-					<a href={resolve('/verdict')} class="text-accent-text underline underline-offset-2">
+					<a href={resolve('/verdict')} class="text-brand-text underline underline-offset-2">
 						Start again
 					</a>
 				</p>
@@ -140,7 +153,7 @@
 				<div class="mt-4 h-1.5 overflow-hidden rounded-full bg-sunken">
 					<!-- Scaled rather than resized, so the bar animates without any layout work. -->
 					<div
-						class="h-full origin-left rounded-full bg-accent transition-transform duration-300"
+						class="h-full origin-left rounded-full bg-brand transition-transform duration-300"
 						style:transform="scaleX({answered / questions.length})"
 					></div>
 				</div>
@@ -161,12 +174,12 @@
 			For a web product built by a team that controls its own interface: yes. It is a short, direct
 			route from an idea to a page that is server-rendered, fast, and fully interactive, and it asks
 			for very little machinery to get there. This site is the evidence. It was built in a single
-			sitting, and every page of it is held to a layout shift of zero by an automated audit.
+			sitting.
 		</p>
 		<p>
 			The price is a smaller ecosystem and a framework that is still changing. If either of those
-			decides things for you, <a href={resolve('/tradeoffs')}>chapter 06</a> was written for you, and
-			you should believe it.
+			decides things for you, <a href={resolve('/tradeoffs')}>chapter 06</a> was written for you,
+			and you should believe it.
 		</p>
 		<p>
 			If you are still undecided, do not take this site's word for it. Take one real page from your
@@ -176,7 +189,7 @@
 
 	<p>
 		<a
-			href={resolve('/')}
+			href={resolve('/rendering')}
 			class="inline-block rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium hover:border-line-strong"
 		>
 			← Back to the beginning

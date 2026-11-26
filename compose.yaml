@@ -1,0 +1,102 @@
+# The services the app needs on a developer's machine: `docker compose up -d --wait`.
+#
+# Every port is published on 127.0.0.1 only. Docker's default is every interface, which would
+# offer a database with a password written in this file to the whole network the machine is on.
+#
+# The values here are for development and are repeated in .env.example. Nothing in this file is
+# for production: a deployment brings its own database and mail server, and has no fake providers.
+
+name: team-collaborator
+
+services:
+  postgres:
+    # The major version is pinned: a data directory written by one major cannot be read by the
+    # next, so moving up is a deliberate step (dump, change this, restore) and never a side
+    # effect of pulling.
+    image: postgres:19-alpine
+    environment:
+      POSTGRES_USER: team
+      POSTGRES_PASSWORD: team
+      POSTGRES_DB: team_collaborator
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # From version 18 the image keeps its data under a directory named for the major version,
+      # and this is where the volume goes. Mounted at the old place, /var/lib/postgresql/data,
+      # the server refuses to start.
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=team --dbname=team_collaborator"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+      start_interval: 1s
+
+  # Billing counts usage here (src/lib/server/billing/redis.ts). Nearly all of what it holds is a
+  # copy of what Postgres has. The exception is usage that has been allowed and not yet written
+  # to the ledger, a quarter of a second's worth, which is why there is an append-only file: a
+  # restart loses nothing. A crash can lose the last second, because the file is flushed to disk
+  # once a second and not on every write, and that second of usage would go unbilled. Flushing on
+  # every write closes that, at a cost to every request that counts something.
+  #
+  # It has no limit on memory and so never evicts. Keep it that way wherever billing runs: a
+  # counter evicted to make room is a limit that silently reset.
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+      start_interval: 1s
+
+  # Catches every email the app sends and shows it at http://localhost:8025. Nothing is
+  # delivered anywhere, and the inbox is emptied when the container is recreated.
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+      start_interval: 1s
+
+  # Plays Google, GitHub and Facebook for sign-in, with no login page (see the script). The app
+  # uses it only while OAUTH_MOCK_URL is set.
+  mock-oauth:
+    image: node:24-alpine
+    command: ["node", "/app/server.js"]
+    # Not root: the script needs nothing, so it is given nothing.
+    user: node
+    environment:
+      PORT: "4000"
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - ./docker/mock-oauth/server.js:/app/server.js:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+      start_interval: 1s
+
+volumes:
+  postgres:
+  redis:
